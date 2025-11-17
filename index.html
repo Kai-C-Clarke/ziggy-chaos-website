@@ -4,7 +4,172 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ziggy Chaos - Digital Home</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Mobile-First CSS */
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+            font-size: 16px;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin: 0;
+        }
+        .subtitle {
+            color: #666;
+            font-style: italic;
+            margin: 5px 0 0 0;
+        }
+        .ziggy-status {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .status-card, .parent-influence {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .status-card h3, .parent-influence h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .influence-bar {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            gap: 10px;
+        }
+        .bar {
+            flex: 1;
+            background: #e9ecef;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .fill {
+            background: #007bff;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .chat-container { 
+            margin: 20px 0; 
+        }
+        .welcome-message {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #007bff;
+        }
+        #chat-messages {
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .message { 
+            margin: 10px 0; 
+            padding: 12px; 
+            border-radius: 8px; 
+            line-height: 1.4;
+        }
+        .user-message { 
+            background: #007bff; 
+            color: white; 
+            text-align: right;
+            margin-left: 20%;
+        }
+        .ziggy-message { 
+            background: #e9ecef; 
+            margin-right: 20%;
+        }
+        .input-area { 
+            display: flex; 
+            gap: 10px; 
+        }
+        input { 
+            flex: 1; 
+            padding: 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            font-size: 16px;
+        }
+        button { 
+            padding: 12px 20px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-style: italic;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            .user-message {
+                margin-left: 10%;
+            }
+            .ziggy-message {
+                margin-right: 10%;
+            }
+            #chat-messages {
+                max-height: 300px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+                font-size: 14px;
+            }
+            .container {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 1.3rem;
+            }
+            .input-area {
+                flex-direction: column;
+            }
+            button {
+                min-height: 44px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -64,7 +229,6 @@
         </footer>
     </div>
 
-    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
