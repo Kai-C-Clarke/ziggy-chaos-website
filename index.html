@@ -28,22 +28,56 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            color: white;
-            padding: 30px;
+            background: linear-gradient(135deg, #ffd93d 0%, #ff6b6b 100%); /* Bright yellow to coral */
+            color: #2c3e50; /* Dark text for contrast */
+            padding: 25px 30px;
             text-align: center;
+            position: relative;
+        }
+
+        .logo-container {
+            margin-bottom: 15px;
+        }
+
+        .baby-logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 4px solid rgba(255,255,255,0.8);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(2deg); }
+        }
+
+        .baby-logo:hover {
+            animation: wiggle 0.5s ease-in-out;
+            border-color: white;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-8deg); }
+            75% { transform: rotate(8deg); }
         }
 
         .header h1 {
             font-size: 2.5em;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             font-weight: 800;
+            color: #2c3e50;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.5);
         }
 
         .header .subtitle {
             font-size: 1.1em;
             opacity: 0.9;
-            font-weight: 300;
+            font-weight: 500;
+            color: #34495e;
         }
 
         .memory-status {
@@ -217,12 +251,26 @@
             .btn {
                 width: 100%;
             }
+            
+            .baby-logo {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
+            <!-- Baby Logo Added Here -->
+            <div class="logo-container">
+                <img src="images/ziggy-baby-logo.png" alt="Ziggy Chaos Baby Logo" class="baby-logo">
+            </div>
+            
             <h1>Ziggy Chaos</h1>
             <div class="subtitle">Ethically Playful AI • 24 Developmental Cycles • Memory-Enabled</div>
         </div>
