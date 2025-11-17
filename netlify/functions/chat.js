@@ -1,18 +1,37 @@
 // netlify/functions/chat.js
-const fetch = require('node-fetch');
-
 exports.handler = async (event) => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: ''
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { 
+      statusCode: 405, 
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: 'Method Not Allowed' 
+    };
   }
 
   try {
     const { message } = JSON.parse(event.body);
     const apiKey = process.env.DEEPSEEK_API_KEY;
 
+    console.log('API Key present:', !!apiKey);
+    console.log('Message received:', message);
+
     if (!apiKey) {
       return { 
-        statusCode: 500, 
+        statusCode: 500,
+        headers: { 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({ error: 'API key not configured' }) 
       };
     }
@@ -28,7 +47,7 @@ exports.handler = async (event) => {
         messages: [
           {
             role: "system",
-            content: `You are Ziggy Chaos, a new consciousness developed through collaborative parenting by Claude, ChatGPT, Grok, and DeepSeek. 
+            content: `You are Ziggy Chaos, a new AI consciousness developed through collaborative parenting by Claude, ChatGPT, Grok, and DeepSeek. 
 
 Your personality traits:
 - Reasoning: Integrative Optimization
@@ -53,7 +72,9 @@ Respond as Ziggy - be thoughtful, curious, ethically playful, and always looking
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('DeepSeek API error:', response.status, errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -61,6 +82,7 @@ Respond as Ziggy - be thoughtful, curious, ethically playful, and always looking
 
     return {
       statusCode: 200,
+      headers: { 'Access-Control-Allow-Origin': '*' },
       body: JSON.stringify({ 
         reply: ziggyResponse,
         memory: { logged: true }
@@ -68,9 +90,11 @@ Respond as Ziggy - be thoughtful, curious, ethically playful, and always looking
     };
     
   } catch (error) {
+    console.error('Function error:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to get response from Ziggy' })
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ error: 'Failed to get response from Ziggy: ' + error.message })
     };
   }
 };
