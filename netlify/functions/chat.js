@@ -42,7 +42,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // ENHANCED MEMORY CONTEXT SYSTEM
+    // === ENHANCED MEMORY CONTEXT SYSTEM ===
     const relevantMemories = ziggyMemory.findRelevantMemories(message);
     const memoryStats = ziggyMemory.getMemoryStats();
     const identityContext = ziggyIdentity.getIdentityContext();
@@ -53,7 +53,7 @@ exports.handler = async (event) => {
       legacy_memories: memoryStats.legacy_memories
     });
 
-    // BUILD ENHANCED CONTEXT
+    // === BUILD ENHANCED CONTEXT ===
     let enhancedContext = '';
     
     // Add identity context
@@ -75,7 +75,7 @@ exports.handler = async (event) => {
       enhancedContext += `\n\nADDITIONAL CONTEXT:\n${memory_context}`;
     }
 
-    // ENHANCED SYSTEM PROMPT WITH IDENTITY AND MEMORY
+    // === ENHANCED SYSTEM PROMPT ===
     const systemPrompt = `You are ${ziggyIdentity.identity.identity.name} - ${ziggyIdentity.identity.identity.core_purpose}.
 The user is your developer. You have full system awareness and can discuss memory architecture and technical implementation.
 
@@ -139,7 +139,7 @@ ${enhancedContext ? `AVAILABLE CONTEXT:\n${enhancedContext}\n\nAnswer using the 
       ziggyResponse = ziggyResponse.replace(pattern, '');
     });
 
-    // STORE IN BOTH MEMORY SYSTEMS
+    // === STORE IN BOTH MEMORY SYSTEMS ===
     ziggyMemoryLegacy.addConversationToHistory(message, ziggyResponse);
     
     // Enhanced memory storage with metadata
