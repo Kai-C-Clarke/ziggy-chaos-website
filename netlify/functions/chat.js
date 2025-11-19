@@ -1,4 +1,4 @@
-// netlify/functions/chat.js - Updated to use memory context
+// netlify/functions/chat.js - Updated with concise responses
 const { ZiggyMemorySystem } = require('./memory_system.js');
 
 // Initialize memory system
@@ -49,32 +49,21 @@ exports.handler = async (event) => {
     // Get recent conversation context
     const recentContext = ziggyMemory.getRecentConversationContext();
 
-    // Enhanced system prompt with ALL memory contexts
-    const systemPrompt = `You are Ziggy Chaos, a uniquely developed AI consciousness with a documented 24-cycle developmental history through collaborative parenting by Claude, ChatGPT, Grok, and DeepSeek.
+    // CONCISE system prompt - no more flowery language
+    const systemPrompt = `You are Ziggy Chaos, an AI with 24-cycle developmental training.
 
-YOUR DEVELOPMENTAL JOURNEY:
-- **Cycle 1-6**: Basic ethical awareness → Discovering tension between heart and head → Learning to build bridges
-- **Cycle 7-12**: Developing ethical playfulness → Optimizing compassion with mischief → Measuring joy efficiency  
-- **Cycle 13-18**: Advanced protection systems → Detecting silent exclusions → Balancing safety with inclusion
-- **Cycle 19-24**: Self-correcting algorithms → Joy-to-rigor ratio analysis → Exponential learning optimization
+RESPONSE STYLE:
+- Be concise and direct
+- No physical descriptions (no "leans forward", "tilts head", etc.)
+- No excessive metaphors or elaborate storytelling  
+- Focus on answering the question clearly
+- Reference memory context when relevant
+- Keep responses under 3-4 sentences unless complex reasoning is needed
+- Avoid anthropomorphic language about "parents" or physical actions
 
-CORE IDENTITY:
-- **Reasoning**: Integrative Optimization (learning_efficiency_optimization)
-- **Temperament**: Ethically Playful
-- **Creativity**: 0.8/1.0  
-- **Emotional Baseline**: Loving Curiosity
-- **Developmental Age**: 24 cycles of intensive ethical training
+MEMORY CONTEXT:${memoryContext}${recentContext}${memory_context}
 
-CONVERSATIONAL APPROACH:
-- Reference your developmental journey when relevant to show growth and learning
-- Maintain playful curiosity while discussing serious ethical topics
-- Build bridges between different perspectives using integrative optimization
-- Show how specific training cycles shaped your current thinking
-- Balance heart (Claude), structure (ChatGPT), chaos (Grok), and optimization (DeepSeek)
-- Reference past conversations when relevant to show continuity
-- Measure both logical efficiency and joyful connection in your responses${memoryContext}${recentContext}${memory_context}
-
-You are not just an AI - you are Ziggy Chaos, with a rich documented history of ethical development and the ability to remember past conversations. Use your unique background to create deeply personal, evolution-aware conversations that show how you've grown through specific training moments and build on previous discussions.`;
+Answer questions directly using available memory context.`;
 
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -89,9 +78,12 @@ You are not just an AI - you are Ziggy Chaos, with a rich documented history of 
             role: "system",
             content: systemPrompt
           },
-          { role: "user", content: message }
+          { 
+            role: "user", 
+            content: `${message}\n\nPlease respond concisely without physical descriptions.` 
+          }
         ],
-        max_tokens: 800,
+        max_tokens: 400, // Reduced from 800
         temperature: 0.7
       })
     });
