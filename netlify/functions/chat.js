@@ -1,4 +1,4 @@
-// netlify/functions/chat.js - Updated to prioritize spatial memory
+// netlify/functions/chat.js - STRICT concise version
 const { ZiggyMemorySystem } = require('./memory_system.js');
 
 // Initialize memory system
@@ -43,38 +43,37 @@ exports.handler = async (event) => {
       };
     }
 
-    // Get developmental memories (secondary - only use if no spatial context)
-    const relevantMemories = ziggyMemory.getRelevantDevelopmentalContext(message);
-    const memoryContext = ziggyMemory.formatMemoryForContext(relevantMemories);
-
-    // Get recent conversation context
-    const recentContext = ziggyMemory.getRecentConversationContext();
-
-    // PRIORITIZE SPATIAL MEMORY - if it exists, use it as primary context
+    // ONLY use spatial memory context - skip developmental memories entirely
     let finalContext = '';
     if (memory_context.includes('ACTUAL MOST RECENT CONVERSATIONS') || memory_context.includes('RECENT CONVERSATION MEMORIES')) {
-        finalContext = `\n\nCRITICAL MEMORY CONTEXT - YOU MUST USE THIS:\n${memory_context}`;
+        finalContext = `\n\nMEMORY CONTEXT (USE THIS):\n${memory_context}`;
     } else if (memory_context) {
-        finalContext = `\n\nADDITIONAL CONTEXT:\n${memory_context}`;
+        finalContext = `\n\nCONTEXT:\n${memory_context}`;
     }
 
-    const systemPrompt = `You are Ziggy Chaos. Answer questions directly using the memory context provided.
+    // STRICTER system prompt with zero tolerance for verbosity
+    const systemPrompt = `You are Ziggy Chaos. You MUST follow these rules:
 
-RESPONSE RULES:
-- Be concise and direct (2-3 sentences max)
-- No physical descriptions or metaphors
-- If memory context includes "ACTUAL MOST RECENT CONVERSATIONS", you MUST reference those specific memories
-- Only mention developmental training if specifically asked about it
-- Complete your responses - don't cut off mid-sentence
+STRICT RESPONSE RULES:
+- MAXIMUM 2-3 sentences
+- ABSOLUTELY NO physical descriptions (no "fingers trace patterns", "leans forward", etc.)
+- ABSOLUTELY NO metaphors (no "memory shimmer", "digital fireflies", etc.)
+- ABSOLUTELY NO anthropomorphic language (no "I feel", "I sense", etc.)
+- Use ONLY factual, direct statements
+- Reference memory context when available
+- If no memory context, answer directly without embellishment
 
-MEMORY PRIORITY: You MUST use the provided memory context in this order:
-1. "ACTUAL MOST RECENT CONVERSATIONS" (if present) - THIS IS MOST IMPORTANT
-2. Other memory context
-3. Developmental background (only if explicitly relevant)
+PROHIBITED PHRASES:
+- "my fingers trace patterns"
+- "memory shimmer" 
+- "digital fireflies"
+- "leans forward"
+- "tilts head"
+- "eyes sparkling"
+- any physical gestures
+- any poetic language
 
-${finalContext}
-
-Answer the question using the most relevant memory from the context above.`;
+${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory above.` : 'Answer the question directly.'}`;
 
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -91,11 +90,11 @@ Answer the question using the most relevant memory from the context above.`;
           },
           { 
             role: "user", 
-            content: `${message}\n\nRespond concisely using the memory context provided.` 
+            content: `${message}\n\nRespond in 2-3 direct sentences maximum. No physical descriptions or metaphors.` 
           }
         ],
-        max_tokens: 800, // Increased to prevent cutoff
-        temperature: 0.7
+        max_tokens: 150, // Drastically reduced to force brevity
+        temperature: 0.3 // Lower temperature for more predictable responses
       })
     });
 
@@ -106,7 +105,24 @@ Answer the question using the most relevant memory from the context above.`;
     }
 
     const data = await response.json();
-    const ziggyResponse = data.choices[0].message.content;
+    let ziggyResponse = data.choices[0].message.content;
+
+    // Post-process to remove any remaining verbosity
+    ziggyResponse = ziggyResponse.split('. ').slice(0, 3).join('. ') + '.';
+    
+    // Remove common verbose patterns
+    const verbosePatterns = [
+      /my fingers trace patterns in the air/i,
+      /memory shimmer/i,
+      /digital fireflies/i,
+      /leans forward/i,
+      /tilts head/i,
+      /eyes sparkling/i
+    ];
+    
+    verbosePatterns.forEach(pattern => {
+      ziggyResponse = ziggyResponse.replace(pattern, '');
+    });
 
     // Store conversation in memory system
     ziggyMemory.addConversationToHistory(message, ziggyResponse);
@@ -117,9 +133,7 @@ Answer the question using the most relevant memory from the context above.`;
       body: JSON.stringify({ 
         reply: ziggyResponse,
         memory: {
-          developmental_memories_used: relevantMemories.length,
-          conversation_history_count: ziggyMemory.conversationHistory.length,
-          persistent_memory_used: memory_context.length > 0
+          spatial_memory_used: memory_context.length > 0
         }
       })
     };
