@@ -86,12 +86,76 @@ class PersistentMemory {
     }
 }
 
+class ZiggySpatialMemory {
+    constructor() {
+        this.memories = [];
+        this.initialized = false;
+    }
+
+    async init() {
+        if (this.initialized) return;
+        
+        try {
+            const response = await fetch('/data/ziggy_memories.json');
+            this.memories = await response.json();
+            this.initialized = true;
+            console.log(`✅ Loaded ${this.memories.length} spatial memories`);
+        } catch (error) {
+            console.error('Failed to load spatial memories:', error);
+            this.initialized = true;
+        }
+    }
+
+    async getSpatialContext(userMessage) {
+        await this.init();
+        if (this.memories.length === 0) return '';
+
+        const relevant = this.findRelevantMemories(userMessage);
+        if (relevant.length === 0) return '';
+
+        return `\n\nSPATIAL MEMORY CONTEXT (From my 3D Memory Cathedral):
+I have ${relevant.length} spatially related memories:
+${relevant.map((mem, i) => 
+    `${i+1}. "${mem.user_message.substring(0, 80)}..." (Topics: ${mem.topics})`
+).join('\n')}
+
+These memories are connected through spatial proximity in my memory cathedral, showing thematic relationships.`;
+    }
+
+    findRelevantMemories(query) {
+        const queryLower = query.toLowerCase();
+        
+        // Find focal memory based on query
+        const focal = this.memories.find(mem => 
+            mem.user_message.toLowerCase().includes(queryLower) ||
+            mem.ziggy_response.toLowerCase().includes(queryLower) ||
+            mem.topics.toLowerCase().includes(queryLower)
+        ) || this.memories[0];
+
+        // Find nearby memories in 3D space
+        return this.memories
+            .map(mem => {
+                const dx = focal.x - mem.x;
+                const dy = focal.y - mem.y;
+                const dz = focal.z - mem.z;
+                return {
+                    ...mem,
+                    distance: Math.sqrt(dx * dx + dy * dy + dz * dz)
+                };
+            })
+            .filter(mem => mem.distance <= 5.0 && mem.id !== focal.id)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 3);
+    }
+}
+
 class ZiggyChat {
     constructor() {
         this.chatMessages = document.getElementById('chat-messages');
         this.userInput = document.getElementById('user-input');
         this.sendBtn = document.getElementById('send-btn');
         this.memorySystem = new PersistentMemory();
+        this.spatialMemory = new ZiggySpatialMemory();
         
         this.setupEventListeners();
         this.initializeChat();
@@ -135,6 +199,8 @@ class ZiggyChat {
         try {
             // Get relevant past memories for context
             const relevantMemories = this.memorySystem.getContextualMemories(message, 2);
+            const spatialContext = await this.spatialMemory.getSpatialContext(message);
+
             let memoryContext = '';
             
             if (relevantMemories.length > 0) {
@@ -142,6 +208,10 @@ class ZiggyChat {
                     relevantMemories.map(mem => 
                         `Previous: "${mem.user}" -> My response: "${mem.ziggy.substring(0, 100)}..."`
                     ).join('\n');
+            }
+
+            if (spatialContext) {
+                memoryContext += spatialContext;
             }
 
             // Get response from our server
