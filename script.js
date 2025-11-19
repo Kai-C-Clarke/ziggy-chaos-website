@@ -98,6 +98,7 @@ class PersistentMemory {
 class ZiggySpatialMemory {
     constructor() {
         this.memories = [];
+        this.conversationMemories = [];
         this.initialized = false;
     }
 
@@ -106,10 +107,44 @@ class ZiggySpatialMemory {
         
         try {
             console.log('🔄 Loading spatial memories...');
-            const response = await fetch('/data/ziggy_memories.json');
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            // Try different possible paths for the memory file
+            const possiblePaths = [
+                '/data/ziggy_memories.json',
+                './data/ziggy_memories.json', 
+                'data/ziggy_memories.json',
+                '/public/data/ziggy_memories.json',
+                './public/data/ziggy_memories.json',
+                'public/data/ziggy_memories.json'
+            ];
+            
+            let response;
+            let lastError;
+            
+            for (const path of possiblePaths) {
+                try {
+                    console.log(`Trying path: ${path}`);
+                    response = await fetch(path);
+                    
+                    if (response.ok) {
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            console.log(`✅ Found memory file at: ${path}`);
+                            break;
+                        } else {
+                            console.log(`❌ Wrong content type at ${path}: ${contentType}`);
+                        }
+                    } else {
+                        console.log(`❌ HTTP error at ${path}: ${response.status}`);
+                    }
+                } catch (err) {
+                    lastError = err;
+                    console.log(`❌ Failed to fetch ${path}:`, err.message);
+                }
+            }
+            
+            if (!response || !response.ok) {
+                throw new Error(`Could not load memory file from any path. Last error: ${lastError?.message}`);
             }
             
             this.memories = await response.json();
@@ -130,39 +165,47 @@ class ZiggySpatialMemory {
             
         } catch (error) {
             console.error('❌ Failed to load spatial memories:', error);
+            // Don't block chat if memories fail
+            this.memories = [];
+            this.conversationMemories = [];
             this.initialized = true;
         }
     }
 
     async getSpatialContext(userMessage) {
-        await this.init();
-        
-        if (this.conversationMemories.length === 0) {
-            console.log('❌ No conversation memories loaded');
+        try {
+            await this.init();
+            
+            if (this.conversationMemories.length === 0) {
+                console.log('❌ No conversation memories loaded');
+                return '';
+            }
+
+            // Special case for "most recent memory" queries
+            if (this.isMostRecentQuery(userMessage)) {
+                console.log('🔍 Detected "most recent memory" query');
+                const context = this.getMostRecentMemoryContext();
+                console.log('📤 Sending context:', context);
+                return context;
+            }
+
+            const relevant = this.findRelevantMemories(userMessage);
+            
+            if (relevant.length === 0) {
+                console.log('❌ No relevant memories found for query:', userMessage);
+                return '';
+            }
+
+            console.log(`📚 Found ${relevant.length} relevant memories`);
+            return `\n\nRECENT CONVERSATION MEMORIES:\n${
+                relevant.map((mem, i) => 
+                    `${i+1}. [${mem.x.toFixed(1)}h ago] "${mem.user_message.substring(0, 80)}..."`
+                ).join('\n')
+            }`;
+        } catch (error) {
+            console.error('❌ Error in getSpatialContext:', error);
             return '';
         }
-
-        // Special case for "most recent memory" queries
-        if (this.isMostRecentQuery(userMessage)) {
-            console.log('🔍 Detected "most recent memory" query');
-            const context = this.getMostRecentMemoryContext();
-            console.log('📤 Sending context:', context);
-            return context;
-        }
-
-        const relevant = this.findRelevantMemories(userMessage);
-        
-        if (relevant.length === 0) {
-            console.log('❌ No relevant memories found for query:', userMessage);
-            return '';
-        }
-
-        console.log(`📚 Found ${relevant.length} relevant memories`);
-        return `\n\nRECENT CONVERSATION MEMORIES:\n${
-            relevant.map((mem, i) => 
-                `${i+1}. [${mem.x.toFixed(1)}h ago] "${mem.user_message.substring(0, 80)}..."`
-            ).join('\n')
-        }`;
     }
 
     isMostRecentQuery(message) {
@@ -277,6 +320,9 @@ class ZiggyChat {
             if (spatialContext) {
                 memoryContext += spatialContext;
             }
+
+            // Log what we're sending to debug
+            console.log('📤 Full memory context being sent:', memoryContext);
 
             const response = await fetch('/.netlify/functions/chat', {
                 method: 'POST',
