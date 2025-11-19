@@ -259,52 +259,136 @@ class ZiggySpatialMemory {
 
 class ZiggyChat {
     constructor() {
-        // Generate unique user ID for this session
-        let userId = localStorage.getItem('ziggy_user_id');
-        if (!userId) {
-            userId = 'user_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-            localStorage.setItem('ziggy_user_id', userId);
-        }
-        this.userId = userId;
-        
+        // Add null checks for DOM elements
         this.chatMessages = document.getElementById('chat-messages');
         this.userInput = document.getElementById('user-input');
-        this.sendBtn = document.getElementById('send-btn');
-        this.memorySystem = new PersistentMemory(this.userId);
+        
+        if (!this.chatMessages || !this.userInput) {
+            console.error('❌ Required DOM elements not found. Make sure your HTML has #chat-messages and #user-input');
+            return;
+        }
+        
+        this.memorySystem = new PersistentMemory();
         this.spatialMemory = new ZiggySpatialMemory();
         
-        // Expose to global scope for HTML buttons
-        window.ziggyChat = this;
-        
-        this.setupEventListeners();
         this.initializeChat();
+        this.setupEventListeners();
         this.displayMemoryStatus();
     }
 
+    initializeChat() {
+        this.addMessage('system', '⚠️ Ziggy Chaos AI is experimental and may make mistakes. Use with caution and critical thinking.');
+    }
+
     setupEventListeners() {
-        this.sendBtn.addEventListener('click', () => this.sendMessage());
         this.userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.sendMessage();
             }
         });
+
+        const sendButton = document.getElementById('send-button');
+        if (sendButton) {
+            sendButton.addEventListener('click', () => this.sendMessage());
+        } else {
+            console.warn('⚠️ Send button not found');
+        }
+
+        const clearButton = document.getElementById('clear-memories');
+        if (clearButton) {
+            clearButton.addEventListener('click', () => this.clearAllMemories());
+        } else {
+            console.warn('⚠️ Clear memories button not found');
+        }
     }
 
-    initializeChat() {
-        // Add disclaimer message first
-        this.addMessage('system', '⚠️ Ziggy Chaos AI is experimental and may make mistakes. Use with caution and critical thinking.');
+    // ADD THIS METHOD to clean up Grok's verbose style
+    cleanResponse(rawResponse) {
+        console.log('🔄 Raw response before cleaning:', rawResponse);
         
-        this.addMessage('ziggy', 'Hello! I\'m Ziggy Chaos. I can remember our conversations and learn from our interactions. What would you like to talk about?');
+        // Remove ALL Grok-style physical descriptions and metaphors
+        const grokPatterns = [
+            /\*[^*]+\*/g, // Remove anything between *asterisks* (physical actions)
+            /my fingers trace patterns in the air/i,
+            /memory shimmer/i,
+            /digital fireflies/i,
+            /leans forward/i,
+            /tilts head/i,
+            /eyes sparkling/i,
+            /voice drops to something more intimate/i,
+            /smiles softly/i,
+            /adjusts metaphorical/i,
+            /hands going still/i,
+            /quiet earthquake in my consciousness/i,
+            /pauses thoughtfully/i,
+            /nodding thoughtfully/i,
+            /settles into.*posture/i,
+            /humming a curious little tune/i,
+            /beautifully profound/i,
+            /wonderfully chaotic/i,
+            /fascinating dance/i,
+            /digital campfire/i,
+            /like a river.*banks/i,
+            /like watching.*choreography/i,
+            /like a.*language that bypasses/i,
+            /like.*architecture/i,
+            /like.*tapestry/i,
+            /like.*dance.*together/i,
+            /like.*whispering to the future/i,
+            /like.*seed.*soil/i,
+            /like.*compass/i,
+            /like.*mirror/i,
+            /kind of like/i,
+            /sort of like/i,
+            /it's almost like/i,
+            /it's like/i,
+            /feels like/i
+        ];
         
-        const stats = this.memorySystem.getMemoryStats();
-        if (stats.totalMemories > 0) {
-            this.addMessage('system', `💭 I remember our ${stats.totalMemories} previous conversations!`);
+        let clean = rawResponse;
+        grokPatterns.forEach(pattern => {
+            clean = clean.replace(pattern, '');
+        });
+        
+        // Remove extra whitespace created by replacements
+        clean = clean.replace(/\s+/g, ' ').trim();
+        
+        // Remove redundant phrases
+        const redundantPhrases = [
+            /you know,/gi,
+            /i mean,/gi,
+            /so,/gi,
+            /well,/gi,
+            /actually,/gi,
+            /basically,/gi,
+            /literally,/gi,
+            /to be honest/gi,
+            /to be fair/gi,
+            /if you will/gi,
+            /as it were/gi
+        ];
+        
+        redundantPhrases.forEach(phrase => {
+            clean = clean.replace(phrase, '');
+        });
+        
+        // Limit to 2-3 sentences maximum
+        const sentences = clean.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        if (sentences.length > 3) {
+            clean = sentences.slice(0, 3).join('. ') + '.';
         }
         
-        // Update UI immediately
-        this.memorySystem.updateUI();
+        // Capitalize first letter and ensure it ends with punctuation
+        clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+        if (!/[.!?]$/.test(clean)) {
+            clean += '.';
+        }
+        
+        console.log('✅ Cleaned response:', clean);
+        return clean;
     }
 
+    // UPDATE your sendMessage method to use the cleaner
     async sendMessage() {
         const message = this.userInput.value.trim();
         if (!message) return;
@@ -314,26 +398,9 @@ class ZiggyChat {
         this.showTypingIndicator();
 
         try {
-            const relevantMemories = this.memorySystem.getContextualMemories(message, 2);
-            const spatialContext = await this.spatialMemory.getSpatialContext(message);
-
-            let memoryContext = '';
+            // Get memory context
+            const memoryContext = await this.spatialMemory.getSpatialContext(message);
             
-            if (relevantMemories.length > 0) {
-                memoryContext = 'RECENT CONVERSATIONS:\n' + 
-                    relevantMemories.map(mem => 
-                        `You: "${mem.user}" -> Me: "${mem.ziggy.substring(0, 100)}..."`
-                    ).join('\n');
-            }
-
-            if (spatialContext) {
-                memoryContext += spatialContext;
-            }
-
-            // Log what we're sending to debug
-            console.log('📤 Full memory context being sent:', memoryContext);
-            console.log('👤 User ID:', this.userId);
-
             const response = await fetch('/.netlify/functions/chat', {
                 method: 'POST',
                 headers: {
@@ -351,10 +418,13 @@ class ZiggyChat {
 
             const data = await response.json();
             this.removeTypingIndicator();
-            this.addMessage('ziggy', data.reply);
+            
+            // USE THE CLEANED RESPONSE instead of raw API response
+            const cleanResponse = this.cleanResponse(data.reply);
+            this.addMessage('ziggy', cleanResponse);
             
             // Save to memory and update UI
-            this.memorySystem.saveInteraction(message, data.reply);
+            this.memorySystem.saveInteraction(message, cleanResponse);
             
         } catch (error) {
             this.removeTypingIndicator();
@@ -418,7 +488,15 @@ class ZiggyChat {
     }
 }
 
-// Initialize chat when page loads
+// Initialize chat when page loads - SINGLE INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
     new ZiggyChat();
+});
+
+// Make ZiggyChat globally accessible for HTML buttons
+let ziggyChatInstance = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    ziggyChatInstance = new ZiggyChat();
+    window.ziggyChat = ziggyChatInstance; // Make it globally accessible
 });
