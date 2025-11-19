@@ -5,12 +5,19 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "convert-memories": "node scripts/convert_sqlite_to_json_fixed.js",
+    "test-memories": "node scripts/test_json_memories.js",
+    "build": "npm run convert-memories && npm run test-memories",
+    "prestart": "npm run convert-memories"
   },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "sqlite3": "^5.1.7"
   },
   "engines": {
     "node": "18.x"
