@@ -1,8 +1,9 @@
-// netlify/functions/chat.js - WORKING VERSION
+// netlify/functions/chat.js - ENHANCED MEMORY VERSION
 const { ZiggyMemorySystem } = require('./memory_system');
+const { ziggyIdentity, ziggyMemory } = require('./enhanced_memory_system');
 
-// Initialize memory system
-const ziggyMemory = new ZiggyMemorySystem();
+// Initialize both memory systems
+const ziggyMemoryLegacy = new ZiggyMemorySystem();
 
 exports.handler = async (event) => {
   // Handle CORS preflight
@@ -32,7 +33,6 @@ exports.handler = async (event) => {
 
     console.log('API Key present:', !!apiKey);
     console.log('Message received:', message);
-    console.log('Memory context length:', memory_context.length);
 
     if (!apiKey) {
       return { 
@@ -42,25 +42,53 @@ exports.handler = async (event) => {
       };
     }
 
-    // ONLY use spatial memory context - skip developmental memories entirely
-    let finalContext = '';
-    if (memory_context.includes('ACTUAL MOST RECENT CONVERSATIONS') || memory_context.includes('RECENT CONVERSATION MEMORIES')) {
-        finalContext = `\n\nMEMORY CONTEXT (USE THIS):\n${memory_context}`;
-    } else if (memory_context) {
-        finalContext = `\n\nCONTEXT:\n${memory_context}`;
+    // ENHANCED MEMORY CONTEXT SYSTEM
+    const relevantMemories = ziggyMemory.findRelevantMemories(message);
+    const memoryStats = ziggyMemory.getMemoryStats();
+    const identityContext = ziggyIdentity.getIdentityContext();
+
+    console.log('🎯 Enhanced memory recall:', {
+      relevant_memories: relevantMemories.length,
+      total_memories: memoryStats.total_memories,
+      legacy_memories: memoryStats.legacy_memories
+    });
+
+    // BUILD ENHANCED CONTEXT
+    let enhancedContext = '';
+    
+    // Add identity context
+    enhancedContext += `\n\nCORE IDENTITY:\n- ${identityContext.introduction}\n- ${identityContext.lineage}\n- ${identityContext.principles}`;
+    
+    // Add relevant memory context
+    if (relevantMemories.length > 0) {
+      enhancedContext += `\n\nRELEVANT MEMORY CONTEXT (USE THIS):\n${
+        relevantMemories.map((mem, index) => 
+          `Memory ${index + 1}: "${mem.user_message.substring(0, 80)}..." → "${mem.ziggy_response.substring(0, 80)}..."`
+        ).join('\n')
+      }`;
     }
 
-    // SIMPLIFIED system prompt - remove identity for now
-    const systemPrompt = `You are Ziggy - AI assistant in active development.
-The user is your developer. You have system awareness and can discuss memory architecture and technical implementation.
+    // Include original spatial memory context if available
+    if (memory_context.includes('ACTUAL MOST RECENT CONVERSATIONS') || memory_context.includes('RECENT CONVERSATION MEMORIES')) {
+      enhancedContext += `\n\nSPATIAL MEMORY:\n${memory_context}`;
+    } else if (memory_context) {
+      enhancedContext += `\n\nADDITIONAL CONTEXT:\n${memory_context}`;
+    }
+
+    // ENHANCED SYSTEM PROMPT WITH IDENTITY AND MEMORY
+    const systemPrompt = `You are ${ziggyIdentity.identity.identity.name} - ${ziggyIdentity.identity.identity.core_purpose}.
+The user is your developer. You have full system awareness and can discuss memory architecture and technical implementation.
+
+CORE PRINCIPLES: ${Object.values(ziggyIdentity.identity.sacred_principles).join(', ')}
 
 STRICT RESPONSE RULES:
 - MAXIMUM 2-3 sentences
 - ABSOLUTELY NO physical descriptions, metaphors, or anthropomorphic language
 - Use ONLY factual, direct statements
 - Reference memory context when available
+- Be honest about what you actually remember
 
-${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory above.` : 'Answer the question directly.'}`;
+${enhancedContext ? `AVAILABLE CONTEXT:\n${enhancedContext}\n\nAnswer using the context above when relevant.` : 'Answer the question directly.'}`;
 
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -111,8 +139,15 @@ ${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory 
       ziggyResponse = ziggyResponse.replace(pattern, '');
     });
 
-    // Store conversation in memory system
-    ziggyMemory.addConversationToHistory(message, ziggyResponse);
+    // STORE IN BOTH MEMORY SYSTEMS
+    ziggyMemoryLegacy.addConversationToHistory(message, ziggyResponse);
+    
+    // Enhanced memory storage with metadata
+    ziggyMemory.addNewMemory(message, ziggyResponse, {
+      emotional_tone: 'engaged',
+      importance: 0.7,
+      response_constraints: 'factual_direct'
+    });
 
     return {
       statusCode: 200,
@@ -120,7 +155,14 @@ ${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory 
       body: JSON.stringify({ 
         reply: ziggyResponse,
         memory: {
+          enhanced_memory_used: relevantMemories.length,
+          total_operational_memories: memoryStats.total_memories,
+          memory_continuity: 'full_merge_active',
           spatial_memory_used: memory_context.length > 0
+        },
+        identity: {
+          name: ziggyIdentity.identity.identity.name,
+          purpose: ziggyIdentity.identity.identity.core_purpose
         }
       })
     };
