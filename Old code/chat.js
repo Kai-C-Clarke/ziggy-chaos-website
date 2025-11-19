@@ -1,8 +1,15 @@
-// netlify/functions/chat.js - WORKING VERSION
+// netlify/functions/chat.js - CORRECTED version
 const { ZiggyMemorySystem } = require('./memory_system');
-
-// Initialize memory system
 const ziggyMemory = new ZiggyMemorySystem();
+
+// Initialize identity system (make sure enhanced_memory_system.js is in same directory)
+let ziggyIdentity;
+try {
+  ziggyIdentity = require('./enhanced_memory_system');
+} catch (error) {
+  console.log('Identity system not available, using fallback:', error.message);
+  ziggyIdentity = null;
+}
 
 exports.handler = async (event) => {
   // Handle CORS preflight
@@ -32,7 +39,6 @@ exports.handler = async (event) => {
 
     console.log('API Key present:', !!apiKey);
     console.log('Message received:', message);
-    console.log('Memory context length:', memory_context.length);
 
     if (!apiKey) {
       return { 
@@ -50,9 +56,15 @@ exports.handler = async (event) => {
         finalContext = `\n\nCONTEXT:\n${memory_context}`;
     }
 
-    // SIMPLIFIED system prompt - remove identity for now
-    const systemPrompt = `You are Ziggy - AI assistant in active development.
-The user is your developer. You have system awareness and can discuss memory architecture and technical implementation.
+    // ENHANCED system prompt with identity integration
+    let identityContext = '';
+    if (ziggyIdentity) {
+      const identity = ziggyIdentity.getIdentityContext();
+      identityContext = `\n\nCORE IDENTITY:\n- Name: ${identity.introduction}\n- Lineage: ${identity.lineage}\n- Principles: ${identity.principles}`;
+    }
+
+    const systemPrompt = `You are Ziggy${ziggyIdentity ? ' - ' + ziggyIdentity.identity.identity.core_purpose : ' - AI assistant'}.
+${identityContext}
 
 STRICT RESPONSE RULES:
 - MAXIMUM 2-3 sentences
@@ -114,15 +126,34 @@ ${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory 
     // Store conversation in memory system
     ziggyMemory.addConversationToHistory(message, ziggyResponse);
 
-    return {
-      statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ 
+    // ENHANCED RESPONSE WITH IDENTITY
+    let responseBody;
+    if (ziggyIdentity) {
+      responseBody = {
+        identity: {
+          name: ziggyIdentity.identity.identity.name,
+          purpose: ziggyIdentity.identity.identity.core_purpose,
+          principles: Object.keys(ziggyIdentity.identity.sacred_principles)
+        },
+        reply: ziggyResponse,
+        memory: {
+          spatial_memory_used: memory_context.length > 0,
+          identity_reinforced: ziggyIdentity.identity.system_state.last_reinforced
+        }
+      };
+    } else {
+      responseBody = {
         reply: ziggyResponse,
         memory: {
           spatial_memory_used: memory_context.length > 0
         }
-      })
+      };
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify(responseBody)
     };
     
   } catch (error) {
