@@ -1,7 +1,9 @@
 // Ziggy Chaos Chat Functionality with Persistent Memory
+// ⚠️ DISCLAIMER: Ziggy Chaos AI is an experimental system and may make mistakes. Use with caution and critical thinking.
+
 class PersistentMemory {
     constructor() {
-        this.maxMemories = 100; // Store up to 100 conversations
+        this.maxMemories = 100;
         this.memoryKey = 'ziggy_conversation_memory';
     }
 
@@ -15,13 +17,14 @@ class PersistentMemory {
         const allMemories = this.getAllMemories();
         allMemories.push(memory);
         
-        // Keep only recent memories
         if (allMemories.length > this.maxMemories) {
             allMemories.shift();
         }
 
         localStorage.setItem(this.memoryKey, JSON.stringify(allMemories));
         console.log('💾 Conversation saved to memory. Total memories:', allMemories.length);
+        this.updateUI();
+        return allMemories.length;
     }
 
     getAllMemories() {
@@ -39,15 +42,12 @@ class PersistentMemory {
         return memories.slice(-limit);
     }
 
-    // Get memories relevant to current conversation topic
     getContextualMemories(currentMessage, limit = 3) {
         const memories = this.getAllMemories();
         if (memories.length === 0) return [];
         
         const message = currentMessage.toLowerCase();
         const relevantMemories = [];
-        
-        // Simple keyword matching for relevance
         const keywords = message.split(' ').filter(word => word.length > 3);
         
         memories.forEach(memory => {
@@ -65,7 +65,6 @@ class PersistentMemory {
             }
         });
         
-        // Sort by relevance and return top matches
         return relevantMemories
             .sort((a, b) => b.relevance - a.relevance)
             .slice(0, limit);
@@ -83,6 +82,16 @@ class PersistentMemory {
     clearMemories() {
         localStorage.removeItem(this.memoryKey);
         console.log('🧹 All memories cleared');
+        this.updateUI();
+        return true;
+    }
+
+    updateUI() {
+        const stats = this.getMemoryStats();
+        const countElement = document.getElementById('memory-count');
+        if (countElement) {
+            countElement.textContent = `${stats.totalMemories} conversations remembered`;
+        }
     }
 }
 
@@ -98,6 +107,8 @@ class ZiggySpatialMemory {
         try {
             const response = await fetch('/data/ziggy_memories.json');
             this.memories = await response.json();
+            // Sort by timestamp - most recent first (x coordinate represents time)
+            this.memories.sort((a, b) => b.x - a.x);
             this.initialized = true;
             console.log(`✅ Loaded ${this.memories.length} spatial memories`);
         } catch (error) {
@@ -113,39 +124,26 @@ class ZiggySpatialMemory {
         const relevant = this.findRelevantMemories(userMessage);
         if (relevant.length === 0) return '';
 
-        return `\n\nSPATIAL MEMORY CONTEXT (From my 3D Memory Cathedral):
-I have ${relevant.length} spatially related memories:
+        return `\n\nRECENT MEMORY CONTEXT (most recent first):
 ${relevant.map((mem, i) => 
-    `${i+1}. "${mem.user_message.substring(0, 80)}..." (Topics: ${mem.topics})`
-).join('\n')}
-
-These memories are connected through spatial proximity in my memory cathedral, showing thematic relationships.`;
+    `${i+1}. [${mem.x.toFixed(1)}h ago] "${mem.user_message.substring(0, 80)}..."`
+).join('\n')}`;
     }
 
     findRelevantMemories(query) {
         const queryLower = query.toLowerCase();
         
-        // Find focal memory based on query
-        const focal = this.memories.find(mem => 
+        // Start with most recent memories first
+        const recentMemories = [...this.memories].sort((a, b) => b.x - a.x);
+        
+        // Find relevant memories, prioritizing recent ones
+        const relevant = recentMemories.filter(mem => 
             mem.user_message.toLowerCase().includes(queryLower) ||
             mem.ziggy_response.toLowerCase().includes(queryLower) ||
             mem.topics.toLowerCase().includes(queryLower)
-        ) || this.memories[0];
+        ).slice(0, 3);
 
-        // Find nearby memories in 3D space
-        return this.memories
-            .map(mem => {
-                const dx = focal.x - mem.x;
-                const dy = focal.y - mem.y;
-                const dz = focal.z - mem.z;
-                return {
-                    ...mem,
-                    distance: Math.sqrt(dx * dx + dy * dy + dz * dz)
-                };
-            })
-            .filter(mem => mem.distance <= 5.0 && mem.id !== focal.id)
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 3);
+        return relevant.length > 0 ? relevant : recentMemories.slice(0, 2);
     }
 }
 
@@ -156,6 +154,9 @@ class ZiggyChat {
         this.sendBtn = document.getElementById('send-btn');
         this.memorySystem = new PersistentMemory();
         this.spatialMemory = new ZiggySpatialMemory();
+        
+        // Expose to global scope for HTML buttons
+        window.ziggyChat = this;
         
         this.setupEventListeners();
         this.initializeChat();
@@ -169,44 +170,41 @@ class ZiggyChat {
                 this.sendMessage();
             }
         });
-
-        // Add memory management UI if needed
-        this.addMemoryManagement();
     }
 
     initializeChat() {
-        // Add welcome message to chat history
-        this.addMessage('ziggy', 'Hello! I\'m Ziggy Chaos. I\'m learning about ethics, compassion, and how to build bridges between different voices. What would you like to talk about?');
+        // Add disclaimer message first
+        this.addMessage('system', '⚠️ Ziggy Chaos AI is experimental and may make mistakes. Use with caution and critical thinking.');
         
-        // Load any recent relevant memories for context
+        this.addMessage('ziggy', 'Hello! I\'m Ziggy Chaos. I can now remember our past conversations and access my spatial memory. What would you like to talk about?');
+        
         const stats = this.memorySystem.getMemoryStats();
         if (stats.totalMemories > 0) {
             this.addMessage('system', `💭 I remember our ${stats.totalMemories} previous conversations!`);
         }
+        
+        // Update UI immediately
+        this.memorySystem.updateUI();
     }
 
     async sendMessage() {
         const message = this.userInput.value.trim();
         if (!message) return;
 
-        // Add user message to chat
         this.addMessage('user', message);
         this.userInput.value = '';
-
-        // Show typing indicator
         this.showTypingIndicator();
 
         try {
-            // Get relevant past memories for context
             const relevantMemories = this.memorySystem.getContextualMemories(message, 2);
             const spatialContext = await this.spatialMemory.getSpatialContext(message);
 
             let memoryContext = '';
             
             if (relevantMemories.length > 0) {
-                memoryContext = '\nRELEVANT PAST CONVERSATIONS:\n' + 
+                memoryContext = 'RECENT CONVERSATIONS:\n' + 
                     relevantMemories.map(mem => 
-                        `Previous: "${mem.user}" -> My response: "${mem.ziggy.substring(0, 100)}..."`
+                        `You: "${mem.user}" -> Me: "${mem.ziggy.substring(0, 100)}..."`
                     ).join('\n');
             }
 
@@ -214,7 +212,6 @@ class ZiggyChat {
                 memoryContext += spatialContext;
             }
 
-            // Get response from our server
             const response = await fetch('/.netlify/functions/chat', {
                 method: 'POST',
                 headers: {
@@ -234,11 +231,8 @@ class ZiggyChat {
             this.removeTypingIndicator();
             this.addMessage('ziggy', data.reply);
             
-            // Save to persistent memory
+            // Save to memory and update UI
             this.memorySystem.saveInteraction(message, data.reply);
-            
-            // Update memory status
-            this.displayMemoryStatus();
             
         } catch (error) {
             this.removeTypingIndicator();
@@ -251,11 +245,14 @@ class ZiggyChat {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}-message`;
         
-        // Add memory indicator for system messages
         if (sender === 'system') {
-            messageDiv.innerHTML = `💭 <em>${text}</em>`;
+            messageDiv.innerHTML = `⚠️ <em>${text}</em>`;
             messageDiv.style.fontStyle = 'italic';
-            messageDiv.style.color = '#666';
+            messageDiv.style.color = '#dc3545';
+            messageDiv.style.backgroundColor = '#fff3cd';
+            messageDiv.style.border = '1px solid #ffeaa7';
+        } else if (sender === 'user') {
+            messageDiv.textContent = text;
         } else {
             messageDiv.textContent = text;
         }
@@ -284,14 +281,18 @@ class ZiggyChat {
     }
 
     displayMemoryStatus() {
-        const stats = this.memorySystem.getMemoryStats();
-        // You could add a small status indicator to your UI
-        console.log('🧠 Memory Stats:', stats);
+        this.memorySystem.updateUI();
     }
 
-    addMemoryManagement() {
-        // Optional: Add a small memory management UI
-        // This could be a button to clear memories or show memory stats
+    // Public method for HTML buttons to call
+    clearAllMemories() {
+        if (confirm('Are you sure you want to clear all conversation memories? This cannot be undone.')) {
+            const success = this.memorySystem.clearMemories();
+            if (success) {
+                this.chatMessages.innerHTML = '';
+                this.initializeChat(); // Restart with disclaimer
+            }
+        }
     }
 }
 
@@ -299,8 +300,3 @@ class ZiggyChat {
 document.addEventListener('DOMContentLoaded', () => {
     new ZiggyChat();
 });
-
-// Export for testing if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ZiggyChat, PersistentMemory };
-}
