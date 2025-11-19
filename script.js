@@ -1,4 +1,4 @@
-// Ziggy Chaos Chat with Personalized Relationship System
+// Ziggy Chaos Chat with Enhanced Memory System
 class PersistentMemory {
     constructor() {
         // Generate or retrieve unique user identity
@@ -221,21 +221,89 @@ Recent conversations: ${recentMemories.map(m => `"${m.user.substring(0, 40)}..."
     }
 }
 
-// ADD THE MISSING ZiggySpatialMemory CLASS
+// ENHANCED SPATIAL MEMORY WITH BACKEND INTEGRATION
 class ZiggySpatialMemory {
     constructor() {
         this.memories = [];
         this.conversationMemories = [];
         this.initialized = false;
+        this.enhancedMemoryActive = false;
+        this.memoryStats = {};
     }
 
     async init() {
         if (this.initialized) return;
         
         try {
-            console.log('🔄 Loading spatial memories...');
+            console.log('🔄 Initializing enhanced memory system...');
             
-            // Try different possible paths for the memory file
+            // Try to load enhanced memory system first
+            const enhancedResult = await this.loadEnhancedMemories();
+            
+            if (enhancedResult.enhanced) {
+                this.enhancedMemoryActive = true;
+                this.memoryStats = enhancedResult.memory_stats;
+                console.log('🚀 ENHANCED MEMORY SYSTEM ACTIVE:', this.memoryStats);
+            } else {
+                // Fallback to legacy JSON memory system
+                console.log('🔄 Falling back to legacy memory system');
+                await this.loadLegacyMemories();
+            }
+            
+            this.initialized = true;
+            
+        } catch (error) {
+            console.error('❌ Memory system initialization failed:', error);
+            // Don't block chat if memories fail
+            this.memories = [];
+            this.conversationMemories = [];
+            this.initialized = true;
+        }
+    }
+
+    // NEW: Enhanced memory loader that connects to backend
+    async loadEnhancedMemories() {
+        try {
+            console.log('🔄 Loading enhanced memories from backend...');
+            
+            const response = await fetch('/.netlify/functions/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    message: 'memory_system_check',
+                    memory_context: 'enhanced_memory_initialization'
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Backend not responding');
+            }
+            
+            const data = await response.json();
+            
+            // Check if enhanced memory system is active
+            if (data.memory && data.memory.enhanced_memory_used !== undefined) {
+                console.log('🎯 ENHANCED MEMORY SYSTEM DETECTED');
+                return {
+                    enhanced: true,
+                    memory_stats: data.memory,
+                    identity: data.identity
+                };
+            }
+            
+            throw new Error('Enhanced memory not active in backend');
+            
+        } catch (error) {
+            console.log('⚠️ Enhanced memory load failed:', error.message);
+            return { enhanced: false };
+        }
+    }
+
+    // Legacy JSON memory loader (fallback)
+    async loadLegacyMemories() {
+        try {
+            console.log('🔄 Loading legacy spatial memories...');
+            
             const possiblePaths = [
                 '/data/ziggy_memories.json',
                 './data/ziggy_memories.json', 
@@ -246,57 +314,38 @@ class ZiggySpatialMemory {
             ];
             
             let response;
-            let lastError;
             
             for (const path of possiblePaths) {
                 try {
                     console.log(`Trying path: ${path}`);
                     response = await fetch(path);
-                    
-                    if (response.ok) {
-                        const contentType = response.headers.get('content-type');
-                        if (contentType && contentType.includes('application/json')) {
-                            console.log(`✅ Found memory file at: ${path}`);
-                            break;
-                        } else {
-                            console.log(`❌ Wrong content type at ${path}: ${contentType}`);
-                        }
-                    } else {
-                        console.log(`❌ HTTP error at ${path}: ${response.status}`);
-                    }
+                    if (response.ok) break;
                 } catch (err) {
-                    lastError = err;
                     console.log(`❌ Failed to fetch ${path}:`, err.message);
                 }
             }
             
             if (!response || !response.ok) {
-                throw new Error(`Could not load memory file from any path. Last error: ${lastError?.message}`);
+                throw new Error('Could not load legacy memory file');
             }
             
             this.memories = await response.json();
             
-            // FOR OTHER USERS: Only show developmental memories, not your personal conversations
-            // This keeps your private conversations private
+            // Filter for shared memories only
             this.conversationMemories = this.memories.filter(mem => 
                 mem.user_message?.includes('Training Cycle') || 
-                mem.id < 23 // Only developmental memories
+                mem.id < 23
             );
             
-            // Sort by timestamp - most recent first (x coordinate represents time)
             this.conversationMemories.sort((a, b) => b.x - a.x);
             
-            this.initialized = true;
-            console.log(`✅ Loaded ${this.memories.length} total memories`);
-            console.log(`✅ ${this.conversationMemories.length} shared memories for users`);
-            console.log('Most recent shared memory:', this.conversationMemories[0]?.user_message);
+            console.log(`✅ Loaded ${this.memories.length} legacy memories`);
+            console.log(`✅ ${this.conversationMemories.length} shared memories`);
             
         } catch (error) {
-            console.error('❌ Failed to load spatial memories:', error);
-            // Don't block chat if memories fail
+            console.error('❌ Legacy memory load failed:', error);
             this.memories = [];
             this.conversationMemories = [];
-            this.initialized = true;
         }
     }
 
@@ -304,36 +353,59 @@ class ZiggySpatialMemory {
         try {
             await this.init();
             
-            if (this.conversationMemories.length === 0) {
-                console.log('❌ No conversation memories loaded');
-                return '';
+            if (this.enhancedMemoryActive) {
+                console.log('🚀 Using enhanced memory system for context');
+                return this.getEnhancedMemoryContext(userMessage);
+            } else {
+                console.log('🔄 Using legacy memory system for context');
+                return this.getLegacyMemoryContext(userMessage);
             }
-
-            // Special case for "most recent memory" queries
-            if (this.isMostRecentQuery(userMessage)) {
-                console.log('🔍 Detected "most recent memory" query');
-                const context = this.getMostRecentMemoryContext();
-                console.log('📤 Sending context:', context);
-                return context;
-            }
-
-            const relevant = this.findRelevantMemories(userMessage);
             
-            if (relevant.length === 0) {
-                console.log('❌ No relevant memories found for query:', userMessage);
-                return '';
-            }
-
-            console.log(`📚 Found ${relevant.length} relevant memories`);
-            return `\n\nSHARED MEMORY CONTEXT:\n${
-                relevant.map((mem, i) => 
-                    `${i+1}. "${mem.user_message.substring(0, 80)}..."`
-                ).join('\n')
-            }`;
         } catch (error) {
             console.error('❌ Error in getSpatialContext:', error);
             return '';
         }
+    }
+
+    // Enhanced memory context using backend
+    async getEnhancedMemoryContext(userMessage) {
+        try {
+            // For enhanced system, we rely on the backend to handle memory recall
+            // We just need to indicate that enhanced memory is available
+            return `\n\nENHANCED MEMORY SYSTEM ACTIVE: ${this.memoryStats.total_operational_memories || 50}+ memories available with full spatial indexing and core identity integration.`;
+            
+        } catch (error) {
+            console.error('❌ Enhanced memory context failed:', error);
+            return this.getLegacyMemoryContext(userMessage);
+        }
+    }
+
+    // Legacy memory context (fallback)
+    getLegacyMemoryContext(userMessage) {
+        if (this.conversationMemories.length === 0) {
+            console.log('❌ No conversation memories loaded');
+            return '';
+        }
+
+        // Special case for "most recent memory" queries
+        if (this.isMostRecentQuery(userMessage)) {
+            console.log('🔍 Detected "most recent memory" query');
+            return this.getMostRecentMemoryContext();
+        }
+
+        const relevant = this.findRelevantMemories(userMessage);
+        
+        if (relevant.length === 0) {
+            console.log('❌ No relevant memories found for query:', userMessage);
+            return '';
+        }
+
+        console.log(`📚 Found ${relevant.length} relevant memories`);
+        return `\n\nSHARED MEMORY CONTEXT:\n${
+            relevant.map((mem, i) => 
+                `${i+1}. "${mem.user_message.substring(0, 80)}..."`
+            ).join('\n')
+        }`;
     }
 
     isMostRecentQuery(message) {
@@ -369,11 +441,8 @@ class ZiggySpatialMemory {
 
     findRelevantMemories(query) {
         const queryLower = query.toLowerCase();
-        
-        // Start with most recent conversation memories first
         const recentMemories = [...this.conversationMemories].sort((a, b) => b.x - a.x);
         
-        // Find relevant conversation memories, prioritizing recent ones
         const relevant = recentMemories.filter(mem => 
             mem.user_message.toLowerCase().includes(queryLower) ||
             mem.ziggy_response.toLowerCase().includes(queryLower) ||
@@ -382,9 +451,19 @@ class ZiggySpatialMemory {
         
         return relevant.length > 0 ? relevant : recentMemories.slice(0, 2);
     }
+
+    // Get memory system status for UI
+    getMemorySystemStatus() {
+        return {
+            enhanced: this.enhancedMemoryActive,
+            stats: this.memoryStats,
+            legacy_memories: this.conversationMemories.length,
+            total_memories: this.memories.length
+        };
+    }
 }
 
-// Update ZiggyChat to use relationship context
+// Enhanced ZiggyChat with Memory System Integration
 class ZiggyChat {
     constructor() {
         // Add null checks for DOM elements
@@ -407,18 +486,29 @@ class ZiggyChat {
     initializeChat() {
         this.addMessage('system', '⚠️ Ziggy Chaos AI is experimental and may make mistakes. Use with caution and critical thinking.');
         
-        // Personalized welcome after a delay
-        setTimeout(() => {
+        // Check memory system status and display appropriate welcome
+        setTimeout(async () => {
+            await this.spatialMemory.init();
+            const memoryStatus = this.spatialMemory.getMemorySystemStatus();
+            
             if (this.memorySystem.getAllMemories().length === 0) {
-                this.addMessage('ziggy', `Hello${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! I'm Ziggy Chaos. Let's build our own memory space together!`);
+                if (memoryStatus.enhanced) {
+                    this.addMessage('ziggy', `Hello${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! I'm Ziggy with enhanced memory - I can recall ${memoryStatus.stats.total_operational_memories}+ past conversations!`);
+                } else {
+                    this.addMessage('ziggy', `Hello${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! I'm Ziggy Chaos. Let's build our own memory space together!`);
+                }
             } else {
                 const stats = this.memorySystem.getMemoryStats();
-                this.addMessage('ziggy', `Welcome back${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! We've had ${stats.totalMemories} conversations across ${stats.topicsDiscussed} topics.`);
+                if (memoryStatus.enhanced) {
+                    this.addMessage('ziggy', `Welcome back${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! Enhanced memory active: ${memoryStatus.stats.total_operational_memories}+ total memories + our ${stats.totalMemories} personal conversations.`);
+                } else {
+                    this.addMessage('ziggy', `Welcome back${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! We've had ${stats.totalMemories} conversations across ${stats.topicsDiscussed} topics.`);
+                }
             }
         }, 500);
     }
 
-    // Enhanced sendMessage to include relationship context
+    // Enhanced sendMessage to include both memory systems
     async sendMessage() {
         const message = this.userInput.value.trim();
         if (!message) return;
@@ -434,6 +524,13 @@ class ZiggyChat {
             
             const combinedContext = spatialContext + relationshipContext;
 
+            console.log('🎯 Sending message with context:', {
+                message_length: message.length,
+                spatial_context: spatialContext.length,
+                relationship_context: relationshipContext.length,
+                enhanced_memory: this.spatialMemory.enhancedMemoryActive
+            });
+
             const response = await fetch('/.netlify/functions/chat', {
                 method: 'POST',
                 headers: {
@@ -446,11 +543,17 @@ class ZiggyChat {
             });
 
             if (!response.ok) {
-                throw new Error('Server error');
+                throw new Error('Server error: ' + response.status);
             }
 
             const data = await response.json();
             this.removeTypingIndicator();
+            
+            console.log('✅ Backend response received:', {
+                reply_length: data.reply?.length,
+                memory_used: data.memory?.enhanced_memory_used,
+                total_memories: data.memory?.total_operational_memories
+            });
             
             // Calculate emotional context for this exchange
             const emotionalContext = this.analyzeEmotionalContext(message, data.reply);
@@ -461,6 +564,11 @@ class ZiggyChat {
             
             // Save to memory with relationship metadata
             this.memorySystem.saveInteraction(message, cleanResponse, emotionalContext);
+            
+            // Update UI with enhanced memory stats if available
+            if (data.memory) {
+                this.displayEnhancedMemoryStatus(data.memory);
+            }
             
         } catch (error) {
             this.removeTypingIndicator();
@@ -489,6 +597,20 @@ class ZiggyChat {
         });
         
         return context.words.length > 0 ? context : null;
+    }
+
+    // Enhanced UI to show memory system status
+    displayEnhancedMemoryStatus(memoryData) {
+        const statusElement = document.getElementById('memory-system-status');
+        if (!statusElement) return;
+        
+        if (memoryData.enhanced_memory_used > 0) {
+            statusElement.innerHTML = `🎯 Enhanced Memory: ${memoryData.enhanced_memory_used} memories recalled from ${memoryData.total_operational_memories} total`;
+            statusElement.style.color = '#28a745';
+        } else {
+            statusElement.innerHTML = `🔄 Basic Memory: ${memoryData.total_operational_memories || 'Unknown'} memories available`;
+            statusElement.style.color = '#6c757d';
+        }
     }
 
     // Add export function to the UI
@@ -523,6 +645,27 @@ class ZiggyChat {
                 memoryActions.appendChild(exportButton);
             }
         }
+
+        // Add memory system status display
+        this.createMemoryStatusDisplay();
+    }
+
+    createMemoryStatusDisplay() {
+        let statusElement = document.getElementById('memory-system-status');
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = 'memory-system-status';
+            statusElement.style.fontSize = '0.9em';
+            statusElement.style.marginTop = '10px';
+            statusElement.style.padding = '5px';
+            statusElement.style.borderRadius = '3px';
+            statusElement.style.backgroundColor = '#f8f9fa';
+            
+            const memoryCount = document.getElementById('memory-count');
+            if (memoryCount && memoryCount.parentNode) {
+                memoryCount.parentNode.appendChild(statusElement);
+            }
+        }
     }
 
     exportMemories() {
@@ -532,7 +675,7 @@ class ZiggyChat {
         }
     }
 
-    // CLEAN RESPONSE METHOD (your existing one)
+    // CLEAN RESPONSE METHOD
     cleanResponse(rawResponse) {
         console.log('🔄 Raw response before cleaning:', rawResponse);
         
