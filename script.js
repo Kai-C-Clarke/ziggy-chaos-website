@@ -2,9 +2,9 @@
 // ⚠️ DISCLAIMER: Ziggy Chaos AI is an experimental system and may make mistakes. Use with caution and critical thinking.
 
 class PersistentMemory {
-    constructor() {
+    constructor(userId = 'default') {
         this.maxMemories = 100;
-        this.memoryKey = 'ziggy_conversation_memory';
+        this.memoryKey = `ziggy_conversation_memory_${userId}`;
     }
 
     saveInteraction(userMessage, ziggyResponse) {
@@ -149,10 +149,11 @@ class ZiggySpatialMemory {
             
             this.memories = await response.json();
             
-            // Filter out developmental training memories, keep only real conversations
+            // FOR OTHER USERS: Only show developmental memories, not your personal conversations
+            // This keeps your private conversations private
             this.conversationMemories = this.memories.filter(mem => 
-                !mem.user_message?.includes('Training Cycle') && 
-                mem.id >= 23 // Only real conversations (IDs 23-45)
+                mem.user_message?.includes('Training Cycle') || 
+                mem.id < 23 // Only developmental memories
             );
             
             // Sort by timestamp - most recent first (x coordinate represents time)
@@ -160,8 +161,8 @@ class ZiggySpatialMemory {
             
             this.initialized = true;
             console.log(`✅ Loaded ${this.memories.length} total memories`);
-            console.log(`✅ ${this.conversationMemories.length} real conversations`);
-            console.log('Most recent conversation:', this.conversationMemories[0]?.user_message);
+            console.log(`✅ ${this.conversationMemories.length} shared memories for users`);
+            console.log('Most recent shared memory:', this.conversationMemories[0]?.user_message);
             
         } catch (error) {
             console.error('❌ Failed to load spatial memories:', error);
@@ -197,9 +198,9 @@ class ZiggySpatialMemory {
             }
 
             console.log(`📚 Found ${relevant.length} relevant memories`);
-            return `\n\nRECENT CONVERSATION MEMORIES:\n${
+            return `\n\nSHARED MEMORY CONTEXT:\n${
                 relevant.map((mem, i) => 
-                    `${i+1}. [${mem.x.toFixed(1)}h ago] "${mem.user_message.substring(0, 80)}..."`
+                    `${i+1}. "${mem.user_message.substring(0, 80)}..."`
                 ).join('\n')
             }`;
         } catch (error) {
@@ -224,15 +225,15 @@ class ZiggySpatialMemory {
         const mostRecent = this.conversationMemories[0];
         const nextRecent = this.conversationMemories.slice(1, 3);
         
-        console.log('🕒 Most recent CONVERSATION memory:', mostRecent?.user_message);
+        console.log('🕒 Most recent SHARED memory:', mostRecent?.user_message);
         
-        let context = `\n\nACTUAL MOST RECENT CONVERSATIONS:\n`;
-        context += `1. [${mostRecent.x.toFixed(1)}h ago] "${mostRecent.user_message}"\n`;
+        let context = `\n\nSHARED MEMORIES:\n`;
+        context += `1. "${mostRecent.user_message}"\n`;
         
         if (nextRecent.length > 0) {
-            context += `\nAlso recent:\n`;
+            context += `\nAlso available:\n`;
             nextRecent.forEach((mem, i) => {
-                context += `${i+2}. [${mem.x.toFixed(1)}h ago] "${mem.user_message.substring(0, 80)}..."\n`;
+                context += `${i+2}. "${mem.user_message.substring(0, 80)}..."\n`;
             });
         }
         
@@ -258,10 +259,18 @@ class ZiggySpatialMemory {
 
 class ZiggyChat {
     constructor() {
+        // Generate unique user ID for this session
+        let userId = localStorage.getItem('ziggy_user_id');
+        if (!userId) {
+            userId = 'user_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+            localStorage.setItem('ziggy_user_id', userId);
+        }
+        this.userId = userId;
+        
         this.chatMessages = document.getElementById('chat-messages');
         this.userInput = document.getElementById('user-input');
         this.sendBtn = document.getElementById('send-btn');
-        this.memorySystem = new PersistentMemory();
+        this.memorySystem = new PersistentMemory(this.userId);
         this.spatialMemory = new ZiggySpatialMemory();
         
         // Expose to global scope for HTML buttons
@@ -285,7 +294,7 @@ class ZiggyChat {
         // Add disclaimer message first
         this.addMessage('system', '⚠️ Ziggy Chaos AI is experimental and may make mistakes. Use with caution and critical thinking.');
         
-        this.addMessage('ziggy', 'Hello! I\'m Ziggy Chaos. I can now remember our past conversations and access my spatial memory. What would you like to talk about?');
+        this.addMessage('ziggy', 'Hello! I\'m Ziggy Chaos. I can remember our conversations and learn from our interactions. What would you like to talk about?');
         
         const stats = this.memorySystem.getMemoryStats();
         if (stats.totalMemories > 0) {
@@ -323,6 +332,7 @@ class ZiggyChat {
 
             // Log what we're sending to debug
             console.log('📤 Full memory context being sent:', memoryContext);
+            console.log('👤 User ID:', this.userId);
 
             const response = await fetch('/.netlify/functions/chat', {
                 method: 'POST',
