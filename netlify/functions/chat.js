@@ -1,4 +1,4 @@
-// netlify/functions/chat.js - Updated with concise responses
+// netlify/functions/chat.js - Updated to prioritize spatial memory
 const { ZiggyMemorySystem } = require('./memory_system.js');
 
 // Initialize memory system
@@ -42,28 +42,31 @@ exports.handler = async (event) => {
       };
     }
 
-    // Get relevant developmental memories based on current message
+    // Get developmental memories (secondary)
     const relevantMemories = ziggyMemory.getRelevantDevelopmentalContext(message);
     const memoryContext = ziggyMemory.formatMemoryForContext(relevantMemories);
     
-    // Get recent conversation context
+    // Get recent conversation context (secondary) 
     const recentContext = ziggyMemory.getRecentConversationContext();
 
-    // CONCISE system prompt - no more flowery language
-    const systemPrompt = `You are Ziggy Chaos, an AI with 24-cycle developmental training.
+    // CONCISE system prompt - SPATIAL MEMORY TAKES PRIORITY
+    const systemPrompt = `You are Ziggy Chaos. Answer questions directly using the memory context provided.
 
-RESPONSE STYLE:
+RESPONSE RULES:
 - Be concise and direct
-- No physical descriptions (no "leans forward", "tilts head", etc.)
-- No excessive metaphors or elaborate storytelling  
-- Focus on answering the question clearly
-- Reference memory context when relevant
-- Keep responses under 3-4 sentences unless complex reasoning is needed
-- Avoid anthropomorphic language about "parents" or physical actions
+- No physical descriptions or metaphors
+- If memory context includes "MOST RECENT MEMORIES", use those first
+- Only reference developmental training if directly relevant to the question
+- Focus on the actual memory content from the context
 
-MEMORY CONTEXT:${memoryContext}${recentContext}${memory_context}
+MEMORY PRIORITY:
+1. Use "MOST RECENT MEMORIES" or "RECENT MEMORY CONTEXT" first
+2. Then use "RECENT CONVERSATIONS" 
+3. Developmental memories are background context only
 
-Answer questions directly using available memory context.`;
+AVAILABLE CONTEXT:${memory_context}${memoryContext}${recentContext}
+
+Answer the question using the most relevant memory context above.`;
 
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -80,10 +83,10 @@ Answer questions directly using available memory context.`;
           },
           { 
             role: "user", 
-            content: `${message}\n\nPlease respond concisely without physical descriptions.` 
+            content: `${message}\n\nUse the memory context provided.` 
           }
         ],
-        max_tokens: 400, // Reduced from 800
+        max_tokens: 400,
         temperature: 0.7
       })
     });
