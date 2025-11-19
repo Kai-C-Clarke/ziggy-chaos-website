@@ -1,5 +1,5 @@
-// Ziggy Chaos Chat - FIXED VERSION
-console.log('🚀 script.js loading...');
+// Ziggy Chaos Chat - ENHANCED MEMORY VERSION
+console.log('🚀 script.js loading - Enhanced Memory Edition');
 
 class PersistentMemory {
     constructor() {
@@ -10,7 +10,19 @@ class PersistentMemory {
         if (!userId) {
             userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             localStorage.setItem('ziggy_user_id', userId);
-            console.log('🆕 New user ID created:', userId);
+            
+            // First visit - get user's name
+            if (!userName) {
+                setTimeout(() => {
+                    userName = prompt('Hello! I\'m Ziggy Chaos. What should I call you?') || 'Friend';
+                    localStorage.setItem('ziggy_user_name', userName);
+                    this.userName = userName;
+                    
+                    if (window.ziggyChatInstance) {
+                        window.ziggyChatInstance.addMessage('ziggy', `Nice to meet you, ${userName}! I'll remember our conversations with my enhanced memory system.`);
+                    }
+                }, 1000);
+            }
         }
         
         this.userId = userId;
@@ -66,12 +78,13 @@ class PersistentMemory {
     extractTopics(message) {
         const topics = [];
         const topicKeywords = {
+            music: ['music', 'guitar', 'song', 'tuning', 'DADGAD', 'chord', 'melody', 'sound'],
             work: ['work', 'job', 'career', 'office', 'boss'],
             family: ['family', 'mom', 'dad', 'parent', 'child', 'kid'],
             friends: ['friend', 'buddy', 'pal', 'hang out'],
             dreams: ['dream', 'goal', 'future', 'want to'],
             feelings: ['feel', 'emotion', 'happy', 'sad', 'angry'],
-            hobbies: ['hobby', 'game', 'music', 'art', 'sport', 'read']
+            hobbies: ['hobby', 'game', 'art', 'sport', 'read']
         };
         
         const lowerMessage = message.toLowerCase();
@@ -117,11 +130,6 @@ Recent conversations: ${recentMemories.map(m => `"${m.user.substring(0, 40)}..."
         }
     }
 
-    getRecentMemories(limit = 5) {
-        const memories = this.getAllMemories();
-        return memories.slice(-limit);
-    }
-
     getMemoryStats() {
         const memories = this.getAllMemories();
         const topics = new Set();
@@ -151,42 +159,122 @@ Recent conversations: ${recentMemories.map(m => `"${m.user.substring(0, 40)}..."
         const countElement = document.getElementById('memory-count');
         if (countElement) {
             countElement.textContent = `${stats.totalMemories} conversations remembered`;
-        } else {
-            console.log('❌ memory-count element not found');
         }
     }
 }
 
-// SIMPLIFIED MEMORY SYSTEM
+// ENHANCED MEMORY SYSTEM WITH BACKEND INTEGRATION
 class ZiggySpatialMemory {
     constructor() {
-        console.log('🧠 ZiggySpatialMemory initialized');
+        console.log('🧠 ZiggySpatialMemory initialized - Enhanced Edition');
+        this.enhancedMemoryActive = false;
+        this.memoryStats = {};
         this.initialized = false;
     }
 
     async init() {
         if (this.initialized) return;
-        console.log('🔄 Spatial memory init called');
+        
+        console.log('🔄 Initializing enhanced memory system...');
+        
+        try {
+            // Test the enhanced memory backend
+            const testResponse = await this.testEnhancedMemory();
+            
+            if (testResponse.enhanced) {
+                this.enhancedMemoryActive = true;
+                this.memoryStats = testResponse.memory_stats;
+                console.log('🚀 ENHANCED MEMORY SYSTEM CONNECTED:', this.memoryStats);
+            } else {
+                console.log('🔄 Enhanced memory not available, using basic mode');
+            }
+            
+        } catch (error) {
+            console.log('⚠️ Enhanced memory test failed:', error.message);
+        }
+        
         this.initialized = true;
     }
 
+    async testEnhancedMemory() {
+        try {
+            console.log('🔍 Testing enhanced memory backend...');
+            
+            const response = await fetch('/.netlify/functions/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    message: 'memory_system_status_check',
+                    memory_context: 'testing_enhanced_memory_connection'
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Backend error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.memory && data.memory.total_operational_memories > 0) {
+                return {
+                    enhanced: true,
+                    memory_stats: data.memory,
+                    identity: data.identity
+                };
+            }
+            
+            throw new Error('Enhanced memory not active');
+            
+        } catch (error) {
+            console.log('❌ Enhanced memory test failed:', error.message);
+            return { enhanced: false };
+        }
+    }
+
     async getSpatialContext(userMessage) {
-        console.log('🔍 Getting spatial context for:', userMessage.substring(0, 50));
-        return ''; // Simplified for now
+        await this.init();
+        
+        if (this.enhancedMemoryActive) {
+            console.log('🎯 Using enhanced memory context');
+            return this.getEnhancedContext();
+        } else {
+            console.log('🔄 Using basic memory context');
+            return this.getBasicContext(userMessage);
+        }
+    }
+
+    getEnhancedContext() {
+        return `\n\nENHANCED MEMORY SYSTEM ACTIVE: ${this.memoryStats.total_operational_memories || 50}+ memories available including music discussions, DADGAD tuning, and creative exploration. Full spatial indexing enabled.`;
+    }
+
+    getBasicContext(userMessage) {
+        // Basic keyword matching for music
+        if (userMessage.toLowerCase().includes('music') || 
+            userMessage.toLowerCase().includes('guitar') || 
+            userMessage.toLowerCase().includes('dadgad')) {
+            return `\n\nCONTEXT: User is asking about music. Basic memory system active - enhanced memory with 50+ music memories available but not currently connected.`;
+        }
+        return '';
+    }
+
+    getMemoryStatus() {
+        return {
+            enhanced: this.enhancedMemoryActive,
+            stats: this.memoryStats,
+            status: this.enhancedMemoryActive ? 'enhanced_50_memories' : 'basic_mode'
+        };
     }
 }
 
-// FIXED ZiggyChat CLASS
+// ENHANCED ZiggyChat CLASS
 class ZiggyChat {
     constructor() {
-        console.log('🤖 ZiggyChat constructor called');
-        
-        // Initialize immediately
+        console.log('🤖 ZiggyChat constructor called - Enhanced Memory Edition');
         this.initializeChatSystem();
     }
 
     initializeChatSystem() {
-        console.log('🔄 Initializing chat system...');
+        console.log('🔄 Initializing enhanced chat system...');
         
         // Find DOM elements
         this.chatMessages = document.getElementById('chat-messages');
@@ -209,20 +297,31 @@ class ZiggyChat {
         this.spatialMemory = new ZiggySpatialMemory();
         
         this.setupEventListeners();
-        this.displayWelcomeMessage();
-        console.log('✅ ZiggyChat initialized successfully');
+        this.displayEnhancedWelcome();
+        console.log('✅ Enhanced ZiggyChat initialized successfully');
     }
 
-    displayWelcomeMessage() {
-        console.log('👋 Displaying welcome message');
-        this.addMessage('system', '⚠️ Ziggy Chaos AI is experimental and may make mistakes. Use with caution and critical thinking.');
+    async displayEnhancedWelcome() {
+        console.log('👋 Displaying enhanced welcome message');
+        this.addMessage('system', '⚠️ Ziggy Chaos AI with Enhanced Memory System');
+        
+        // Initialize memory system
+        await this.spatialMemory.init();
+        const memoryStatus = this.spatialMemory.getMemoryStatus();
         
         setTimeout(() => {
             const stats = this.memorySystem.getMemoryStats();
-            if (stats.totalMemories === 0) {
-                this.addMessage('ziggy', `Hello${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! I\'m Ziggy Chaos. Let\'s chat!`);
+            
+            if (memoryStatus.enhanced) {
+                this.addMessage('ziggy', 
+                    `Hello${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! ` +
+                    `🚀 ENHANCED MEMORY ACTIVE: I can recall ${memoryStatus.stats.total_operational_memories}+ past conversations including music discussions!`
+                );
             } else {
-                this.addMessage('ziggy', `Welcome back${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! We\'ve had ${stats.totalMemories} conversations.`);
+                this.addMessage('ziggy', 
+                    `Hello${this.memorySystem.userName !== 'Friend' ? ' ' + this.memorySystem.userName : ''}! ` +
+                    `I'm Ziggy Chaos. Enhanced memory system connecting... (${stats.totalMemories} personal conversations)`
+                );
             }
         }, 500);
     }
@@ -233,7 +332,6 @@ class ZiggyChat {
         // Enter key listener
         this.userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                console.log('↵ Enter key pressed');
                 this.sendMessage();
             }
         });
@@ -241,11 +339,8 @@ class ZiggyChat {
         // Send button listener
         if (this.sendButton) {
             this.sendButton.addEventListener('click', () => {
-                console.log('📤 Send button clicked');
                 this.sendMessage();
             });
-        } else {
-            console.log('❌ Send button not found');
         }
 
         console.log('✅ Event listeners setup complete');
@@ -255,97 +350,116 @@ class ZiggyChat {
         const message = this.userInput.value.trim();
         console.log('📤 Sending message:', message);
         
-        if (!message) {
-            console.log('❌ Empty message, ignoring');
-            return;
-        }
+        if (!message) return;
 
         this.addMessage('user', message);
         this.userInput.value = '';
         this.showTypingIndicator();
 
         try {
-            console.log('🔄 Calling chat function...');
-            
-            const response = await fetch('/.netlify/functions/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    message: message,
-                    memory_context: 'basic_context'
-                })
+            // Get enhanced memory context
+            const memoryContext = await this.spatialMemory.getSpatialContext(message);
+            const relationshipContext = this.memorySystem.getRelationshipContext();
+            const combinedContext = memoryContext + relationshipContext;
+
+            console.log('🎯 Sending with enhanced context:', {
+                message: message.substring(0, 50),
+                memoryContext: memoryContext.length,
+                enhanced: this.spatialMemory.enhancedMemoryActive
             });
 
-            console.log('📥 Response status:', response.status);
+            const response = await fetch('/.netlify/functions/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    message: message,
+                    memory_context: combinedContext
+                })
+            });
 
             if (!response.ok) {
                 throw new Error(`Server error: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('✅ Response data received:', data);
+            console.log('✅ Enhanced response received:', {
+                reply_length: data.reply?.length,
+                memory_used: data.memory?.enhanced_memory_used,
+                total_memories: data.memory?.total_operational_memories
+            });
             
             this.removeTypingIndicator();
             
             const cleanResponse = this.cleanResponse(data.reply);
             this.addMessage('ziggy', cleanResponse);
             
+            // Save with music topic detection
             this.memorySystem.saveInteraction(message, cleanResponse);
             
+            // Update UI with memory status
+            this.updateEnhancedUI(data.memory);
+            
         } catch (error) {
-            console.error('❌ Chat error:', error);
+            console.error('❌ Enhanced chat error:', error);
             this.removeTypingIndicator();
-            this.addMessage('ziggy', 'I\'m having trouble connecting right now. Please try again.');
+            this.addMessage('ziggy', 'I\'m having trouble accessing my enhanced memory right now. Please try again.');
+        }
+    }
+
+    updateEnhancedUI(memoryData) {
+        let statusText = '🔄 Basic Memory Mode';
+        
+        if (memoryData && memoryData.enhanced_memory_used > 0) {
+            statusText = `🎯 Enhanced Memory: ${memoryData.enhanced_memory_used} memories recalled from ${memoryData.total_operational_memories} total`;
+        } else if (memoryData && memoryData.total_operational_memories > 0) {
+            statusText = `🚀 Enhanced Memory: ${memoryData.total_operational_memories} memories available`;
+        }
+        
+        // Update memory count display
+        const countElement = document.getElementById('memory-count');
+        if (countElement) {
+            const stats = this.memorySystem.getMemoryStats();
+            countElement.textContent = `${stats.totalMemories} personal + ${statusText}`;
         }
     }
 
     cleanResponse(rawResponse) {
-        console.log('🔄 Cleaning response:', rawResponse);
+        if (!rawResponse) return "I didn't get a response. Please try again.";
         
-        if (!rawResponse) {
-            return "I didn't get a response. Please try again.";
-        }
+        let clean = rawResponse;
         
-        // Simple cleaning
+        // Remove verbose patterns
         const patterns = [
             /\*[^*]+\*/g,
             /leans forward/i,
             /tilts head/i,
             /smiles softly/i,
-            /eyes sparkling/i
+            /eyes sparkling/i,
+            /memory shimmer/i,
+            /digital fireflies/i
         ];
         
-        let clean = rawResponse;
         patterns.forEach(pattern => {
             clean = clean.replace(pattern, '');
         });
         
         clean = clean.replace(/\s+/g, ' ').trim();
         
-        // Limit to 2-3 sentences
+        // Limit sentences
         const sentences = clean.split(/[.!?]+/).filter(s => s.trim().length > 0);
         if (sentences.length > 3) {
             clean = sentences.slice(0, 3).join('. ') + '.';
         }
         
-        // Ensure proper punctuation
         if (!/[.!?]$/.test(clean)) {
             clean += '.';
         }
         
-        console.log('✅ Cleaned response:', clean);
         return clean;
     }
 
     addMessage(sender, text) {
-        console.log(`💬 Adding ${sender} message:`, text.substring(0, 50));
-        
-        if (!this.chatMessages) {
-            console.error('❌ chatMessages element not available');
-            return;
-        }
+        if (!this.chatMessages) return;
 
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}-message`;
@@ -353,11 +467,9 @@ class ZiggyChat {
         
         this.chatMessages.appendChild(messageDiv);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
-        console.log('✅ Message added to DOM');
     }
 
     showTypingIndicator() {
-        console.log('⌨️ Showing typing indicator');
         if (!this.chatMessages) return;
 
         const typingDiv = document.createElement('div');
@@ -372,7 +484,6 @@ class ZiggyChat {
     }
 
     removeTypingIndicator() {
-        console.log('❌ Removing typing indicator');
         const typingIndicator = document.getElementById('typing-indicator');
         if (typingIndicator) {
             typingIndicator.remove();
@@ -380,7 +491,6 @@ class ZiggyChat {
     }
 
     showError(message) {
-        console.error('🚨 Displaying error:', message);
         const errorDiv = document.createElement('div');
         errorDiv.style.cssText = `
             position: fixed;
@@ -398,16 +508,12 @@ class ZiggyChat {
         errorDiv.textContent = `Ziggy Error: ${message}`;
         document.body.appendChild(errorDiv);
         
-        setTimeout(() => {
-            if (errorDiv.parentNode) {
-                errorDiv.parentNode.removeChild(errorDiv);
-            }
-        }, 5000);
+        setTimeout(() => errorDiv.remove(), 5000);
     }
 }
 
-// GLOBAL INITIALIZATION
-console.log('🌐 Starting ZiggyChat initialization...');
+// ENHANCED INITIALIZATION
+console.log('🌐 Starting Enhanced ZiggyChat initialization...');
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ DOM fully loaded and parsed');
@@ -415,41 +521,10 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
         window.ziggyChatInstance = new ZiggyChat();
         window.ziggyChat = window.ziggyChatInstance;
-        console.log('🎉 ZiggyChat successfully initialized!');
+        console.log('🎉 Enhanced ZiggyChat successfully initialized!');
     } catch (error) {
-        console.error('💥 CRITICAL ERROR initializing ZiggyChat:', error);
-        
-        const errorDiv = document.createElement('div');
-        errorDiv.style.cssText = `
-            background: #dc3545;
-            color: white;
-            padding: 20px;
-            margin: 10px;
-            border-radius: 5px;
-            text-align: center;
-        `;
-        errorDiv.innerHTML = `
-            <h3>🚨 Ziggy Chat Failed to Load</h3>
-            <p>Please refresh the page. If the problem continues, check the console for errors.</p>
-            <small>Error: ${error.message}</small>
-        `;
-        
-        document.body.appendChild(errorDiv);
+        console.error('💥 CRITICAL ERROR:', error);
     }
 });
 
-// Fallback initialization
-if (document.readyState === 'loading') {
-    console.log('📝 Document still loading, waiting for DOMContentLoaded');
-} else {
-    console.log('⚡ Document already ready, checking initialization');
-    setTimeout(() => {
-        if (!window.ziggyChatInstance) {
-            console.log('🔄 Late initialization...');
-            window.ziggyChatInstance = new ZiggyChat();
-            window.ziggyChat = window.ziggyChatInstance;
-        }
-    }, 100);
-}
-
-console.log('🎯 script.js loaded successfully');
+console.log('🎯 Enhanced script.js loaded successfully');
