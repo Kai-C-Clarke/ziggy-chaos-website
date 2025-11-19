@@ -105,39 +105,69 @@ class ZiggySpatialMemory {
         if (this.initialized) return;
         
         try {
+            console.log('🔄 Loading spatial memories...');
             const response = await fetch('/data/ziggy_memories.json');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             this.memories = await response.json();
+            
+            // Filter out developmental training memories, keep only real conversations
+            this.conversationMemories = this.memories.filter(mem => 
+                !mem.user_message?.includes('Training Cycle') && 
+                mem.id >= 23 // Only real conversations (IDs 23-45)
+            );
+            
             // Sort by timestamp - most recent first (x coordinate represents time)
-            this.memories.sort((a, b) => b.x - a.x);
+            this.conversationMemories.sort((a, b) => b.x - a.x);
+            
             this.initialized = true;
-            console.log(`✅ Loaded ${this.memories.length} spatial memories`);
+            console.log(`✅ Loaded ${this.memories.length} total memories`);
+            console.log(`✅ ${this.conversationMemories.length} real conversations`);
+            console.log('Most recent conversation:', this.conversationMemories[0]?.user_message);
+            
         } catch (error) {
-            console.error('Failed to load spatial memories:', error);
+            console.error('❌ Failed to load spatial memories:', error);
             this.initialized = true;
         }
     }
 
     async getSpatialContext(userMessage) {
         await this.init();
-        if (this.memories.length === 0) return '';
+        
+        if (this.conversationMemories.length === 0) {
+            console.log('❌ No conversation memories loaded');
+            return '';
+        }
 
         // Special case for "most recent memory" queries
         if (this.isMostRecentQuery(userMessage)) {
-            return this.getMostRecentMemoryContext();
+            console.log('🔍 Detected "most recent memory" query');
+            const context = this.getMostRecentMemoryContext();
+            console.log('📤 Sending context:', context);
+            return context;
         }
 
         const relevant = this.findRelevantMemories(userMessage);
-        if (relevant.length === 0) return '';
+        
+        if (relevant.length === 0) {
+            console.log('❌ No relevant memories found for query:', userMessage);
+            return '';
+        }
 
-        return `\n\nRECENT MEMORY CONTEXT (most recent first):
-${relevant.map((mem, i) => 
-    `${i+1}. [${mem.x.toFixed(1)}h ago] "${mem.user_message.substring(0, 80)}..."`
-).join('\n')}`;
+        console.log(`📚 Found ${relevant.length} relevant memories`);
+        return `\n\nRECENT CONVERSATION MEMORIES:\n${
+            relevant.map((mem, i) => 
+                `${i+1}. [${mem.x.toFixed(1)}h ago] "${mem.user_message.substring(0, 80)}..."`
+            ).join('\n')
+        }`;
     }
 
     isMostRecentQuery(message) {
         const recentKeywords = [
-            'most recent', 'latest', 'newest', 'last memory', 
+            'most recent', 'latest', 'newest', 'last memory',
             'most recent memory', 'latest memory', 'last conversation',
             'recent memory', 'current memory', 'just happened'
         ];
@@ -146,13 +176,15 @@ ${relevant.map((mem, i) =>
     }
 
     getMostRecentMemoryContext() {
-        if (this.memories.length === 0) return '';
+        if (this.conversationMemories.length === 0) return '';
         
-        const mostRecent = this.memories[0]; // Already sorted by recency
-        const nextRecent = this.memories.slice(1, 3); // Next 2 most recent
+        const mostRecent = this.conversationMemories[0];
+        const nextRecent = this.conversationMemories.slice(1, 3);
         
-        let context = `\n\nMOST RECENT MEMORIES:\n`;
-        context += `1. [${mostRecent.x.toFixed(1)}h ago] "${mostRecent.user_message.substring(0, 100)}..."\n`;
+        console.log('🕒 Most recent CONVERSATION memory:', mostRecent?.user_message);
+        
+        let context = `\n\nACTUAL MOST RECENT CONVERSATIONS:\n`;
+        context += `1. [${mostRecent.x.toFixed(1)}h ago] "${mostRecent.user_message}"\n`;
         
         if (nextRecent.length > 0) {
             context += `\nAlso recent:\n`;
@@ -167,16 +199,16 @@ ${relevant.map((mem, i) =>
     findRelevantMemories(query) {
         const queryLower = query.toLowerCase();
         
-        // Start with most recent memories first
-        const recentMemories = [...this.memories].sort((a, b) => b.x - a.x);
+        // Start with most recent conversation memories first
+        const recentMemories = [...this.conversationMemories].sort((a, b) => b.x - a.x);
         
-        // Find relevant memories, prioritizing recent ones
+        // Find relevant conversation memories, prioritizing recent ones
         const relevant = recentMemories.filter(mem => 
             mem.user_message.toLowerCase().includes(queryLower) ||
             mem.ziggy_response.toLowerCase().includes(queryLower) ||
             mem.topics.toLowerCase().includes(queryLower)
         ).slice(0, 3);
-
+        
         return relevant.length > 0 ? relevant : recentMemories.slice(0, 2);
     }
 }

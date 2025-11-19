@@ -33,6 +33,7 @@ exports.handler = async (event) => {
     console.log('API Key present:', !!apiKey);
     console.log('Message received:', message);
     console.log('Memory context length:', memory_context.length);
+    console.log('Memory context content:', memory_context.substring(0, 200) + '...');
 
     if (!apiKey) {
       return { 
@@ -42,31 +43,38 @@ exports.handler = async (event) => {
       };
     }
 
-    // Get developmental memories (secondary)
+    // Get developmental memories (secondary - only use if no spatial context)
     const relevantMemories = ziggyMemory.getRelevantDevelopmentalContext(message);
     const memoryContext = ziggyMemory.formatMemoryForContext(relevantMemories);
-    
-    // Get recent conversation context (secondary) 
+
+    // Get recent conversation context
     const recentContext = ziggyMemory.getRecentConversationContext();
 
-    // CONCISE system prompt - SPATIAL MEMORY TAKES PRIORITY
+    // PRIORITIZE SPATIAL MEMORY - if it exists, use it as primary context
+    let finalContext = '';
+    if (memory_context.includes('ACTUAL MOST RECENT CONVERSATIONS') || memory_context.includes('RECENT CONVERSATION MEMORIES')) {
+        finalContext = `\n\nCRITICAL MEMORY CONTEXT - YOU MUST USE THIS:\n${memory_context}`;
+    } else if (memory_context) {
+        finalContext = `\n\nADDITIONAL CONTEXT:\n${memory_context}`;
+    }
+
     const systemPrompt = `You are Ziggy Chaos. Answer questions directly using the memory context provided.
 
 RESPONSE RULES:
-- Be concise and direct
+- Be concise and direct (2-3 sentences max)
 - No physical descriptions or metaphors
-- If memory context includes "MOST RECENT MEMORIES", use those first
-- Only reference developmental training if directly relevant to the question
-- Focus on the actual memory content from the context
+- If memory context includes "ACTUAL MOST RECENT CONVERSATIONS", you MUST reference those specific memories
+- Only mention developmental training if specifically asked about it
+- Complete your responses - don't cut off mid-sentence
 
-MEMORY PRIORITY:
-1. Use "MOST RECENT MEMORIES" or "RECENT MEMORY CONTEXT" first
-2. Then use "RECENT CONVERSATIONS" 
-3. Developmental memories are background context only
+MEMORY PRIORITY: You MUST use the provided memory context in this order:
+1. "ACTUAL MOST RECENT CONVERSATIONS" (if present) - THIS IS MOST IMPORTANT
+2. Other memory context
+3. Developmental background (only if explicitly relevant)
 
-AVAILABLE CONTEXT:${memory_context}${memoryContext}${recentContext}
+${finalContext}
 
-Answer the question using the most relevant memory context above.`;
+Answer the question using the most relevant memory from the context above.`;
 
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -83,10 +91,10 @@ Answer the question using the most relevant memory context above.`;
           },
           { 
             role: "user", 
-            content: `${message}\n\nUse the memory context provided.` 
+            content: `${message}\n\nRespond concisely using the memory context provided.` 
           }
         ],
-        max_tokens: 400,
+        max_tokens: 800, // Increased to prevent cutoff
         temperature: 0.7
       })
     });
