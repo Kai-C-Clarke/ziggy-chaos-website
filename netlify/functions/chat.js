@@ -59,9 +59,8 @@ exports.handler = async (event) => {
 
     // Enhanced system prompt with identity integration
     let identityContext = '';
-    if (ziggyIdentity) {
-      const identity = ziggyIdentity.getIdentityContext();
-      identityContext = `\n\nCORE IDENTITY:\n- Name: ${identity.introduction}\n- Lineage: ${identity.lineage}\n- Principles: ${identity.principles}`;
+    if (ziggyIdentity && ziggyIdentity.identity) {
+      identityContext = `\n\nCORE IDENTITY:\n- Name: ${ziggyIdentity.identity.identity.name}\n- Purpose: ${ziggyIdentity.identity.identity.core_purpose}\n- Created: ${ziggyIdentity.identity.identity.creation_story}`;
     }
 
     const systemPrompt = `You are Ziggy${ziggyIdentity ? ' - ' + ziggyIdentity.identity.identity.core_purpose : ' - AI assistant'}.
@@ -129,17 +128,17 @@ ${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory 
 
     // Enhanced response with identity
     let responseBody;
-    if (ziggyIdentity) {
+    if (ziggyIdentity && ziggyIdentity.identity) {
       responseBody = {
         identity: {
           name: ziggyIdentity.identity.identity.name,
           purpose: ziggyIdentity.identity.identity.core_purpose,
-          principles: Object.keys(ziggyIdentity.identity.sacred_principles)
+          principles: ziggyIdentity.identity.sacred_principles ? Object.keys(ziggyIdentity.identity.sacred_principles) : []
         },
         reply: ziggyResponse,
         memory: {
           spatial_memory_used: memory_context.length > 0,
-          identity_reinforced: ziggyIdentity.identity.system_state.last_reinforced
+          identity_reinforced: ziggyIdentity.identity.system_state ? ziggyIdentity.identity.system_state.last_reinforced : null
         }
       };
     } else {
