@@ -228,22 +228,76 @@ class ZiggySpatialMemory {
         };
     }
 
+    /**
+     * Extract meaningful keywords from query
+     * Removes common words and extracts nouns/verbs
+     */
+    extractKeywords(query) {
+        // Common words to ignore (articles, prepositions, etc.)
+        const stopWords = new Set([
+            'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during',
+            'before', 'after', 'above', 'below', 'between', 'under', 'again',
+            'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why',
+            'how', 'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some',
+            'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too',
+            'very', 'can', 'will', 'just', 'should', 'now',
+            'what', 'who', 'which', 'whose', 'whom', 'tell', 'me', 'you', 'your',
+            'are', 'is', 'was', 'were', 'been', 'being', 'have', 'has', 'had',
+            'do', 'does', 'did', 'doing'
+        ]);
+
+        // Split query into words and filter
+        const words = query.toLowerCase()
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .split(/\s+/)
+            .filter(word => 
+                word.length > 2 &&
+                !stopWords.has(word)
+            );
+
+        return words;
+    }
+
     findFocalMemory(query) {
-        const lowerQuery = query.toLowerCase();
+        // Extract meaningful keywords
+        const keywords = this.extractKeywords(query);
+        
+        if (keywords.length === 0) {
+            // Fallback: search entire query
+            const lowerQuery = query.toLowerCase();
+            return this.memories.find(memory => 
+                memory.user_message?.toLowerCase().includes(lowerQuery) ||
+                memory.ziggy_response?.toLowerCase().includes(lowerQuery) ||
+                memory.topics?.toLowerCase().includes(lowerQuery)
+            );
+        }
+
         let bestMatch = null;
         let bestScore = 0;
 
         for (const memory of this.memories) {
             let score = 0;
+            const memoryText = [
+                memory.user_message || '',
+                memory.ziggy_response || '',
+                memory.topics || ''
+            ].join(' ').toLowerCase();
 
-            if (memory.user_message?.toLowerCase().includes(lowerQuery)) {
-                score += 5;
-            }
-            if (memory.ziggy_response?.toLowerCase().includes(lowerQuery)) {
-                score += 3;
-            }
-            if (memory.topics?.toLowerCase().includes(lowerQuery)) {
-                score += 4;
+            // Score based on keyword matches
+            for (const keyword of keywords) {
+                if (memoryText.includes(keyword)) {
+                    // Weight by field
+                    if (memory.topics?.toLowerCase().includes(keyword)) {
+                        score += 4;
+                    }
+                    if (memory.user_message?.toLowerCase().includes(keyword)) {
+                        score += 3;
+                    }
+                    if (memory.ziggy_response?.toLowerCase().includes(keyword)) {
+                        score += 2;
+                    }
+                }
             }
 
             // Boost by importance
@@ -254,6 +308,13 @@ class ZiggySpatialMemory {
                 bestMatch = memory;
             }
         }
+
+        console.log('🔍 Keyword search:', {
+            query,
+            keywords,
+            bestScore,
+            foundMemory: !!bestMatch
+        });
 
         return bestMatch;
     }
