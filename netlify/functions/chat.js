@@ -1,247 +1,168 @@
-// spatialMemoryNavigator.js - Adds 3D navigation to existing memory system
-// Integrates with your memoryConstraints.js
+// netlify/functions/chat.js - Main API handler
+const { ZiggyMemorySystem } = require('./memory_system');
+const ziggyMemory = new ZiggyMemorySystem();
 
-class SpatialMemoryNavigator {
-    constructor(memories = []) {
-      this.memories = memories;
-    }
-  
-    /**
-     * CORE NAVIGATION: Think about a topic by exploring 3D memory space
-     * This is what makes spatial memory different from keyword search
-     */
-    thinkAbout(query, explorationRadius = 25) {
-      // Find focal memory (most relevant)
-      const focal = this.findFocalMemory(query);
-      
-      if (!focal) {
-        return {
-          focal: null,
-          nearby: [],
-          synthesis: "No relevant memories found in spatial exploration"
-        };
-      }
-  
-      // Explore spatial neighborhood
-      const nearby = this.findNearbyMemories(focal, explorationRadius);
-      
-      // Synthesize pattern from spatial proximity
-      const synthesis = this.synthesizePattern(focal, nearby);
-  
-      return {
-        focal,
-        nearby,
-        synthesis,
-        spatialContext: this.formatSpatialContext(focal, nearby)
-      };
-    }
-  
-    /**
-     * Find most relevant memory for query
-     */
-    findFocalMemory(query) {
-      const lowerQuery = query.toLowerCase();
-      let bestMatch = null;
-      let bestScore = 0;
-  
-      for (const memory of this.memories) {
-        let score = 0;
-  
-        // Score based on content relevance
-        if (memory.user_message?.toLowerCase().includes(lowerQuery)) {
-          score += 5;
-        }
-        if (memory.ziggy_response?.toLowerCase().includes(lowerQuery)) {
-          score += 3;
-        }
-        if (memory.topics?.toLowerCase().includes(lowerQuery)) {
-          score += 4;
-        }
-  
-        // Boost by importance
-        score *= (memory.importance || 5) / 5;
-  
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = memory;
-        }
-      }
-  
-      return bestMatch;
-    }
-  
-    /**
-     * Find memories within spatial radius using 3D Euclidean distance
-     * This is the key spatial navigation function
-     */
-    findNearbyMemories(focalMemory, radius) {
-      const nearby = [];
-      const fx = focalMemory.x;
-      const fy = focalMemory.y;
-      const fz = focalMemory.z;
-  
-      for (const memory of this.memories) {
-        if (memory.id === focalMemory.id) continue;
-  
-        // Calculate 3D Euclidean distance
-        const dx = memory.x - fx;
-        const dy = memory.y - fy;
-        const dz = memory.z - fz;
-        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-  
-        if (distance <= radius) {
-          nearby.push({
-            ...memory,
-            distance,
-            spatial_relationship: this.classifyRelationship(dx, dy, dz)
-          });
-        }
-      }
-  
-      // Sort by distance
-      return nearby.sort((a, b) => a.distance - b.distance);
-    }
-  
-    /**
-     * Classify spatial relationship (what the distance means)
-     */
-    classifyRelationship(dx, dy, dz) {
-      const relationships = [];
-  
-      if (Math.abs(dx) < 5) relationships.push('same_timeframe');
-      if (Math.abs(dy) < 20) relationships.push('same_topic');
-      if (Math.abs(dz) < 2) relationships.push('similar_intensity');
-      
-      if (Math.abs(dy) > 100) relationships.push('cross_domain');
-  
-      return relationships.length > 0 ? relationships : ['related'];
-    }
-  
-    /**
-     * Synthesize insight from spatial proximity
-     * This is where thinking emerges from navigation
-     */
-    synthesizePattern(focal, nearby) {
-      if (nearby.length === 0) {
-        return "Isolated memory with no nearby spatial connections";
-      }
-  
-      // Analyze topics
-      const allTopics = [focal, ...nearby]
-        .map(m => m.topics?.split(',') || [])
-        .flat()
-        .filter(t => t.trim());
-      
-      const topicCounts = {};
-      allTopics.forEach(topic => {
-        const t = topic.trim();
-        topicCounts[t] = (topicCounts[t] || 0) + 1;
-      });
-  
-      const dominantTopics = Object.entries(topicCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([topic]) => topic);
-  
-      // Build synthesis
-      let synthesis = `Memory cluster around ${dominantTopics.join(', ')}. `;
-  
-      // Check for cross-domain connections
-      const crossDomain = nearby.filter(m => 
-        m.spatial_relationship.includes('cross_domain')
-      );
-      if (crossDomain.length > 0) {
-        synthesis += `${crossDomain.length} cross-domain connections found. `;
-      }
-  
-      // Check temporal spread
-      const times = nearby.map(m => m.x);
-      if (times.length > 0) {
-        const timeSpan = Math.max(...times) - Math.min(...times);
-        if (timeSpan > 0.5) {
-          synthesis += `Spans ${timeSpan.toFixed(1)}h of conversation history.`;
-        }
-      }
-  
-      return synthesis;
-    }
-  
-    /**
-     * Format spatial context for LLM prompt
-     * This gets included in the system prompt
-     */
-    formatSpatialContext(focal, nearby) {
-      if (!focal) return '';
-  
-      let context = `\n\nRECENT CONVERSATION MEMORIES (Spatial Navigation):\n\n`;
-      context += `FOCAL MEMORY (Most Relevant):\n`;
-      context += `Time: ${focal.x.toFixed(1)}h | Topic Region: Y=${focal.y} | Intensity: Z=${focal.z}\n`;
-      context += `User: "${focal.user_message}"\n`;
-      context += `Ziggy: "${focal.ziggy_response}"\n\n`;
-  
-      if (nearby.length > 0) {
-        context += `NEARBY MEMORIES (Within spatial radius ~25):\n`;
-        nearby.slice(0, 3).forEach((mem, i) => {
-          context += `\n${i+1}. Distance: ${mem.distance.toFixed(1)} units | ${mem.spatial_relationship.join(', ')}\n`;
-          context += `   User: "${mem.user_message?.slice(0, 80)}..."\n`;
-          context += `   Ziggy: "${mem.ziggy_response?.slice(0, 80)}..."\n`;
-        });
-      }
-  
-      return context;
-    }
-  
-    /**
-     * Find breakthrough moments (high importance)
-     */
-    findBreakthroughs(minImportance = 7) {
-      return this.memories
-        .filter(m => m.importance >= minImportance)
-        .sort((a, b) => b.importance - a.importance || b.x - a.x)
-        .slice(0, 10);
-    }
-  
-    /**
-     * Track how a topic evolved over time
-     */
-    findTemporalProgression(topic) {
-      const lowerTopic = topic.toLowerCase();
-      
-      return this.memories
-        .filter(m => 
-          m.topics?.toLowerCase().includes(lowerTopic) ||
-          m.user_message?.toLowerCase().includes(lowerTopic) ||
-          m.ziggy_response?.toLowerCase().includes(lowerTopic)
-        )
-        .sort((a, b) => a.x - b.x);
-    }
-  
-    /**
-     * Get memory statistics
-     */
-    getStats() {
-      if (this.memories.length === 0) {
-        return { total: 0, earliest: 0, latest: 0, breakthroughs: 0 };
-      }
-  
-      const times = this.memories.map(m => m.x);
-      const importances = this.memories.map(m => m.importance || 5);
-  
-      return {
-        total: this.memories.length,
-        earliest: Math.min(...times),
-        latest: Math.max(...times),
-        avgImportance: importances.reduce((a, b) => a + b, 0) / importances.length,
-        breakthroughs: this.memories.filter(m => m.importance >= 7).length
-      };
-    }
-  
-    /**
-     * Load memories from array
-     */
-    loadMemories(memories) {
-      this.memories = memories;
-    }
+// Initialize identity system
+let ziggyIdentity;
+try {
+  ziggyIdentity = require('./enhanced_memory_system');
+} catch (error) {
+  console.log('Identity system not available, using fallback:', error.message);
+  ziggyIdentity = null;
+}
+
+exports.handler = async (event) => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: ''
+    };
   }
-  
-  module.exports = SpatialMemoryNavigator;
+
+  if (event.httpMethod !== 'POST') {
+    return { 
+      statusCode: 405, 
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: 'Method Not Allowed' 
+    };
+  }
+
+  try {
+    const { message, memory_context = '' } = JSON.parse(event.body);
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+
+    console.log('API Key present:', !!apiKey);
+    console.log('Message received:', message);
+
+    if (!apiKey) {
+      return { 
+        statusCode: 500,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ error: 'API key not configured' }) 
+      };
+    }
+
+    // Use spatial memory context if provided
+    let finalContext = '';
+    if (memory_context.includes('ACTUAL MOST RECENT CONVERSATIONS') || 
+        memory_context.includes('RECENT CONVERSATION MEMORIES')) {
+        finalContext = `\n\nMEMORY CONTEXT (USE THIS):\n${memory_context}`;
+    } else if (memory_context) {
+        finalContext = `\n\nCONTEXT:\n${memory_context}`;
+    }
+
+    // Enhanced system prompt with identity integration
+    let identityContext = '';
+    if (ziggyIdentity) {
+      const identity = ziggyIdentity.getIdentityContext();
+      identityContext = `\n\nCORE IDENTITY:\n- Name: ${identity.introduction}\n- Lineage: ${identity.lineage}\n- Principles: ${identity.principles}`;
+    }
+
+    const systemPrompt = `You are Ziggy${ziggyIdentity ? ' - ' + ziggyIdentity.identity.identity.core_purpose : ' - AI assistant'}.
+${identityContext}
+
+STRICT RESPONSE RULES:
+- MAXIMUM 2-3 sentences
+- ABSOLUTELY NO physical descriptions, metaphors, or anthropomorphic language
+- Use ONLY factual, direct statements
+- Reference memory context when available
+
+${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory above.` : 'Answer the question directly.'}`;
+
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          { 
+            role: "user", 
+            content: `${message}\n\nRespond in 2-3 direct sentences maximum. No physical descriptions or metaphors.` 
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('DeepSeek API error:', response.status, errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    let ziggyResponse = data.choices[0].message.content;
+
+    // Post-process to remove any remaining verbosity
+    ziggyResponse = ziggyResponse.split('. ').slice(0, 3).join('. ') + '.';
+    
+    // Remove common verbose patterns
+    const verbosePatterns = [
+      /my fingers trace patterns in the air/i,
+      /memory shimmer/i,
+      /digital fireflies/i,
+      /leans forward/i,
+      /tilts head/i,
+      /eyes sparkling/i
+    ];
+    
+    verbosePatterns.forEach(pattern => {
+      ziggyResponse = ziggyResponse.replace(pattern, '');
+    });
+
+    // Store conversation in memory system
+    ziggyMemory.addConversationToHistory(message, ziggyResponse);
+
+    // Enhanced response with identity
+    let responseBody;
+    if (ziggyIdentity) {
+      responseBody = {
+        identity: {
+          name: ziggyIdentity.identity.identity.name,
+          purpose: ziggyIdentity.identity.identity.core_purpose,
+          principles: Object.keys(ziggyIdentity.identity.sacred_principles)
+        },
+        reply: ziggyResponse,
+        memory: {
+          spatial_memory_used: memory_context.length > 0,
+          identity_reinforced: ziggyIdentity.identity.system_state.last_reinforced
+        }
+      };
+    } else {
+      responseBody = {
+        reply: ziggyResponse,
+        memory: {
+          spatial_memory_used: memory_context.length > 0
+        }
+      };
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify(responseBody)
+    };
+    
+  } catch (error) {
+    console.error('Function error:', error);
+    return {
+      statusCode: 500,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ error: 'Failed to get response from Ziggy: ' + error.message })
+    };
+  }
+};
