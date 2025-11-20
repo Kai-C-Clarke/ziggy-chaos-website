@@ -1,31 +1,30 @@
 import { useState, useEffect } from 'react';
 import { ZiggySpatialMemory } from '../utils/ziggy_spatial_memory.js';
-import { MemoryConsecrationEngine } from '../utils/memory_consecration_engine.js';
 
 export const useZiggyMemory = () => {
   const [spatialMemory, setSpatialMemory] = useState(null);
-  const [consecrationEngine, setConsecrationEngine] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     const initializeMemory = async () => {
       const memory = new ZiggySpatialMemory();
-      const consecration = new MemoryConsecrationEngine();
-      
       await memory.init();
       
       setSpatialMemory(memory);
-      setConsecrationEngine(consecration);
       setIsInitialized(true);
     };
 
     initializeMemory();
   }, []);
 
-  const enhanceResponse = async (userMessage, baseResponse) => {
+  /**
+   * Get spatial context for a query
+   * Returns formatted context to send to API (NOT to add to response)
+   */
+  const getSpatialContext = async (userMessage) => {
     if (!spatialMemory || !isInitialized) {
-      console.log('Memory system not ready, using base response');
-      return baseResponse;
+      console.log('Memory system not ready');
+      return '';
     }
 
     try {
@@ -33,39 +32,64 @@ export const useZiggyMemory = () => {
       const thoughts = await spatialMemory.thinkAbout(userMessage);
       
       if (!thoughts.focal) {
-        return baseResponse;
+        return '';
       }
 
-      // Enhance with multi-base coordinates
-      const enhancedFocal = consecrationEngine.enhanceMemoryWithCoordinates(thoughts.focal);
-      const enhancedNearby = thoughts.nearby.map(mem => 
-        consecrationEngine.enhanceMemoryWithCoordinates(mem)
-      );
-
-      // Generate spatial reflection
-      const spatialReflection = generateSpatialReflection(enhancedFocal, enhancedNearby, thoughts.synthesis);
+      // Format SILENT spatial context (for system prompt, not user-facing)
+      const context = formatSilentSpatialContext(thoughts.focal, thoughts.nearby, thoughts.synthesis);
       
-      return spatialReflection + '\n\n' + baseResponse;
+      console.log('📍 Spatial navigation:', {
+        focal: thoughts.focal.user_message?.slice(0, 50),
+        nearby: thoughts.nearby.length,
+        synthesis: thoughts.synthesis
+      });
+      
+      return context;
       
     } catch (error) {
-      console.error('Memory enhancement failed:', error);
-      return baseResponse;
+      console.error('Spatial memory navigation failed:', error);
+      return '';
     }
   };
 
-  const generateSpatialReflection = (focal, nearby, synthesis) => {
-    return `I've been exploring patterns in my memory space. 
+  /**
+   * Format spatial context SILENTLY for system prompt
+   * NO verbose "exploring memory space" text
+   */
+  const formatSilentSpatialContext = (focal, nearby, synthesis) => {
+    let context = 'RECENT CONVERSATION MEMORIES (Spatial Navigation):\n\n';
+    
+    context += 'FOCAL MEMORY (Most Relevant):\n';
+    context += `Time: ${focal.x?.toFixed(1) || 0}h | Topic: ${focal.topics || 'general'}\n`;
+    context += `User: "${focal.user_message}"\n`;
+    context += `Ziggy: "${focal.ziggy_response?.slice(0, 200)}..."\n\n`;
+    
+    if (nearby.length > 0) {
+      context += `NEARBY MEMORIES (${nearby.length} found):\n`;
+      nearby.slice(0, 3).forEach((mem, i) => {
+        context += `${i+1}. Distance: ${mem.distance?.toFixed(1) || 0} units\n`;
+        context += `   User: "${mem.user_message?.slice(0, 80)}..."\n`;
+        context += `   Ziggy: "${mem.ziggy_response?.slice(0, 80)}..."\n\n`;
+      });
+    }
+    
+    context += `Pattern: ${synthesis}`;
+    
+    return context;
+  };
 
-**Spatial Context:**
-- Focal memory from ${focal.x.toFixed(1)}h: "${focal.user_message.slice(0, 100)}..."
-- ${nearby.length} nearby memories within distance ~25
-- ${synthesis}
-
-What's fascinating is seeing how these memories connect across different dimensions of my thinking.`;
+  /**
+   * DEPRECATED: Old enhanceResponse function
+   * Keep for backwards compatibility but don't use
+   */
+  const enhanceResponse = async (userMessage, baseResponse) => {
+    console.warn('enhanceResponse is deprecated - use getSpatialContext instead');
+    return baseResponse;
   };
 
   return {
-    enhanceResponse,
+    getSpatialContext,  // NEW: Use this to get context for API
+    enhanceResponse,    // DEPRECATED: Don't use this
     isInitialized,
     spatialMemory
   };
