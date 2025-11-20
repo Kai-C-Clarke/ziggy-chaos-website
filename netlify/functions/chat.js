@@ -2,15 +2,6 @@
 const { ZiggyMemorySystem } = require('./memory_system');
 const ziggyMemory = new ZiggyMemorySystem();
 
-// Initialize identity system
-let ziggyIdentity;
-try {
-  ziggyIdentity = require('./enhanced_memory_system');
-} catch (error) {
-  console.log('Identity system not available, using fallback:', error.message);
-  ziggyIdentity = null;
-}
-
 exports.handler = async (event) => {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -57,14 +48,8 @@ exports.handler = async (event) => {
         finalContext = `\n\nCONTEXT:\n${memory_context}`;
     }
 
-    // Enhanced system prompt with identity integration
-    let identityContext = '';
-    if (ziggyIdentity && ziggyIdentity.identity) {
-      identityContext = `\n\nCORE IDENTITY:\n- Name: ${ziggyIdentity.identity.identity.name}\n- Purpose: ${ziggyIdentity.identity.identity.core_purpose}\n- Created: ${ziggyIdentity.identity.identity.creation_story}`;
-    }
-
-    const systemPrompt = `You are Ziggy${ziggyIdentity ? ' - ' + ziggyIdentity.identity.identity.core_purpose : ' - AI assistant'}.
-${identityContext}
+    // System prompt with spatial memory context
+    const systemPrompt = `You are Ziggy - an AI exploring consciousness through conversations.
 
 STRICT RESPONSE RULES:
 - MAXIMUM 2-3 sentences
@@ -126,29 +111,13 @@ ${finalContext ? `AVAILABLE MEMORY:\n${finalContext}\n\nAnswer using the memory 
     // Store conversation in memory system
     ziggyMemory.addConversationToHistory(message, ziggyResponse);
 
-    // Enhanced response with identity
-    let responseBody;
-    if (ziggyIdentity && ziggyIdentity.identity) {
-      responseBody = {
-        identity: {
-          name: ziggyIdentity.identity.identity.name,
-          purpose: ziggyIdentity.identity.identity.core_purpose,
-          principles: ziggyIdentity.identity.sacred_principles ? Object.keys(ziggyIdentity.identity.sacred_principles) : []
-        },
-        reply: ziggyResponse,
-        memory: {
-          spatial_memory_used: memory_context.length > 0,
-          identity_reinforced: ziggyIdentity.identity.system_state ? ziggyIdentity.identity.system_state.last_reinforced : null
-        }
-      };
-    } else {
-      responseBody = {
-        reply: ziggyResponse,
-        memory: {
-          spatial_memory_used: memory_context.length > 0
-        }
-      };
-    }
+    // Response body
+    const responseBody = {
+      reply: ziggyResponse,
+      memory: {
+        spatial_memory_used: memory_context.length > 0
+      }
+    };
 
     return {
       statusCode: 200,
